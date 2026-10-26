@@ -25,7 +25,7 @@
           name = "gemma-4-E2B-it";
           repo = "unsloth/gemma-4-E2B-it-GGUF";
           file = "gemma-4-E2B-it-Q4_K_M.gguf";
-          hash = lib.fakeHash;
+          hash = "sha256-dAGFsh0izrg6EcOqYq1YQu8yxw9gltdWu+6FoeTsNLg=";
           ollama = "gemma4:e2b";
         };
         gemma4-e4b = {
@@ -39,7 +39,7 @@
           name = "gemma-4-31B-it";
           repo = "unsloth/gemma-4-31B-it-GGUF";
           file = "gemma-4-31B-it-Q4_K_M.gguf";
-          hash = lib.fakeHash;
+          hash = "sha256-OL1kyFLEtGBDTMcWL6m9zyQvr4ZQJYGnVMtylWuxf4Q=";
           ollama = "gemma4:31b";
         };
       };
@@ -361,7 +361,10 @@
     in
     {
       config = lib.mkIf (cfg.enable && cfg.harness == "opencode") {
-        home.packages = [ troubleshoot ];
+        home.packages = [
+          troubleshoot
+          pkgs.pciutils
+        ];
         home.file.".config/opencode/AGENTS.md".text = cfg.systemPrompt;
 
         programs.opencode = {

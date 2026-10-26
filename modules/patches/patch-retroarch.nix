@@ -32,7 +32,6 @@
             retroarch-assets
             libretro-core-info
             retroarch-joypad-autoconfig
-            libretro-database
             libretro.mgba
             libretro.snes9x
             libretro.gambatte

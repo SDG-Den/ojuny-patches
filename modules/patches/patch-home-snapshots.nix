@@ -114,7 +114,7 @@
               message = "home-snapshots requires a passwordFile";
             }
             {
-              assertion = lib.all (path: lib.hasPrefix "/home/" path) cfg.paths;
+              assertion = lib.all (path: path == "/home" || lib.hasPrefix "/home/" path) cfg.paths;
               message = "home-snapshots may only snapshot paths under /home";
             }
           ];
