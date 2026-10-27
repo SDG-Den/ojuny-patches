@@ -1,5 +1,5 @@
 name: Docker
 id: patch-docker
-description: Docker containerization support via nix, containers configurable through the GUI
+description: Docker daemon, rootless mode, pruning, daemon settings and declarative containers
 dependencies:
 version: 1

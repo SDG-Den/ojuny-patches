@@ -1,5 +1,5 @@
 name: Auxiliary hardware
 id: patch-aux-hardware
-description: Fingerprint, tablet and FIDO2 support
+description: OpenTabletDriver tablet support
 dependencies:
-version: 1
+version: 2
