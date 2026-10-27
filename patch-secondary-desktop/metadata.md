@@ -1,31 +1,25 @@
 name: Secondary desktop
 id: patch-secondary-desktop
-description: Niri or Sway Wayland session installed alongside Mango and DMS
+description: Optional KDE Plasma 6, GNOME, XFCE, COSMIC and Cinnamon sessions alongside Mango and DMS
 dependencies:
 version: 1
 
 ## Session
 
-The patch installs one extra Wayland session. It does not change
-`services.displayManager.defaultSession`, the Mango session, or DMS settings,
-so Ojuny remains the default login.
+Each desktop is an independent toggle: KDE Plasma 6, GNOME, XFCE, COSMIC, and
+Cinnamon. Enable only the sessions you want. The patch does not change the
+default login session, so Ojuny remains the default after a rebuild.
 
-Niri is the default because the pinned nixpkgs `18dd725c` contains both the
-Niri package and its NixOS module. Sway is available through the `desktop`
-option as the fallback.
-
-The NixOS session modules register the package in
+The NixOS desktop modules register their sessions in
 `services.displayManager.sessionPackages`, which is the path the DMS greeter
-scans. After enabling the patch and rebuilding, log out and pick the extra
-session in the greeter.
+scans. Log out and pick the extra session in the greeter after enabling a
+desktop.
 
 ## Configuration
 
-The patch writes a minimal config:
+There is no per-desktop configuration in this patch. Each desktop is installed
+and left at its own defaults. Configure it from that desktop's own settings
+menu after logging in. Ojuny does not manage those settings declaratively.
 
-- Niri: `/etc/niri/config.kdl`, used when the user has no
-  `~/.config/niri/config.kdl`.
-- Sway: `/etc/sway/config`.
-
-Both configs bind `Mod+Return` to `ghostty` and `Mod+D` to the DMS spotlight.
-The user can override either config in their home directory.
+XFCE and Cinnamon also enable the X server because their sessions need it.
+Plasma, GNOME, and COSMIC use their own Wayland sessions.

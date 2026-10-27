@@ -3,7 +3,7 @@
   displayname = "Gaming launchers";
   icon = "applications-games-symbolic";
   order = 185;
-  description = "Lutris and Heroic with Wine, Proton and 32-bit graphics";
+  description = "Lutris and Heroic with Wine and Proton";
   category = "Patches";
   systems = [ "all" ];
 */
@@ -80,7 +80,7 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Gaming launchers"; group = "Gaming launchers"; description = "Install Lutris and Heroic with Wine, Proton and 32-bit graphics.";
+          # @option widget = "switch"; label = "Gaming launchers"; group = "Gaming launchers"; description = "Install Lutris and Heroic with Wine and Proton.";
           ojuny.patch.gaming-launchers.enable = false;
 
           # @option widget = "switch"; label = "Lutris"; group = "Launchers"; description = "Install Lutris. It fetches DXVK and VKD3D on first launch."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
@@ -106,13 +106,6 @@
             lib.optionals launcherEnabled (launcherPackages ++ sharedPackages);
 
           hardware.graphics.enable = lib.mkIf launcherEnabled true;
-          hardware.graphics.enable32Bit =
-            lib.mkIf (launcherEnabled && pkgs.stdenv.hostPlatform.isx86_64) true;
-
-          services.pipewire.alsa.support32Bit =
-            lib.mkIf (launcherEnabled && config.services.pipewire.alsa.enable) true;
-          services.pulseaudio.support32Bit =
-            lib.mkIf (launcherEnabled && config.services.pulseaudio.enable) true;
 
           programs.steam.extraCompatPackages =
             lib.mkIf (cfg.protonGE && config.programs.steam.enable) [
