@@ -33,6 +33,8 @@
 
       pamArgsText = lib.concatStringsSep " " pamArgs;
 
+      u2fMode = if cfg.control == "required" then "and" else "or";
+
       fido2 = pkgs.writeShellApplication {
         name = "ojuny-fido2";
         runtimeInputs = with pkgs; [
@@ -409,6 +411,9 @@
               session  required ${pamPermit}
             '';
           };
+
+          desktop.ojuny.dms.settings.enableU2f = lib.mkIf cfg.services.lock (lib.mkForce true);
+          desktop.ojuny.dms.settings.u2fMode = lib.mkIf cfg.services.lock (lib.mkForce u2fMode);
         })
       ];
     };

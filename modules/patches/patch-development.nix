@@ -266,8 +266,8 @@
           };
           searchRoot = lib.mkOption {
             type = lib.types.str;
-            default = "$HOME/repos";
-            description = "Directory searched for git repositories. $HOME is expanded by the shell.";
+            default = "$OJUNY_REPO_PATH/..";
+            description = "Directory searched for git repositories. $OJUNY_REPO_PATH is expanded by the shell.";
           };
           editorCommand = lib.mkOption {
             type = lib.types.str;
@@ -337,8 +337,8 @@
           # @option widget = "switch"; label = "Project menu"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install the projects picker, its alias, and the Super+Shift+Tab keybind.";
           ojuny.patch.development.projects.enable = true;
 
-          # @option widget = "text"; label = "Project search root"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Directory searched for git repositories. $HOME is expanded by the shell.";
-          ojuny.patch.development.projects.searchRoot = "$HOME/repos";
+          # @option widget = "text"; label = "Project search root"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Directory searched for git repositories. $OJUNY_REPO_PATH is expanded by the shell.";
+          ojuny.patch.development.projects.searchRoot = "$OJUNY_REPO_PATH/..";
 
           # @option widget = "text"; label = "Project editor command"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Single executable used by the project picker, for example codium or code.";
           ojuny.patch.development.projects.editorCommand = "codium";
@@ -433,7 +433,10 @@
       cfg = osConfig.ojuny.patch.development or { enable = false; };
       active = cfg.enable && (osConfig.ojuny.patches or true);
 
-      flakeRef = "git+file://${config.home.homeDirectory}/repos/nix-flake";
+      flakeRef = "git+file://${
+        osConfig.environment.variables.OJUNY_REPO_PATH
+          or "${config.home.homeDirectory}/${osConfig.ojuny.repoPath or "repos/nix-flake"}"
+      }";
 
       languageEnabled = name: cfg.languages.${name}.enable or false;
       onAgent = name: cfg.agents.${name}.enable or false;

@@ -659,7 +659,7 @@
         nixos-version
         uname -a
         echo "## nix"
-        nix flake metadata "$HOME/${cfg.projectDir}" 2>&1 | head -40
+        nix flake metadata "''${OJUNY_REPO_PATH:-$HOME/${cfg.projectDir}}" 2>&1 | head -40
         echo "## failed units"
         systemctl --failed --no-pager
         echo "## errors"
