@@ -8,6 +8,8 @@
   systems = [ "all" ];
 */
 
+# @inputs name = "nixvim"; url = "github:nix-community/nixvim";
+
 { self, inputs, ... }:
 let
   hasNixvim = inputs ? nixvim;
