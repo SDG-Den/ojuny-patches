@@ -131,7 +131,7 @@ in
         defaultEditor = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Set EDITOR and VISUAL to nvim. The template's zsh init still exports micro.";
+          description = "Set EDITOR and VISUAL to nvim. The template's global EDITOR default is micro.";
         };
 
         languages = lib.mkOption {
@@ -152,7 +152,7 @@ in
           # @option widget = "dropdown"; label = "Engine"; group = "Nixvim"; choices = [ "auto" "nixvim" "native" ]; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "auto uses Nixvim when the host flake provides inputs.nixvim, otherwise native Neovim.";
           ojuny.patch.nixvim.engine = "auto";
 
-          # @option widget = "switch"; label = "Default editor"; group = "Nixvim"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Set EDITOR and VISUAL to nvim. The template's zsh init still exports micro.";
+          # @option widget = "switch"; label = "Default editor"; group = "Nixvim"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Set EDITOR and VISUAL to nvim. The template's global EDITOR default is micro.";
           ojuny.patch.nixvim.defaultEditor = false;
 
           # @option widget = "list"; label = "Language servers"; group = "Language servers"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Languages whose LSP server is installed and enabled.";
