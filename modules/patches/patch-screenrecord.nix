@@ -1102,14 +1102,14 @@
             [ overlayRule ] ++ lib.optionals (cfg.obs.enable && cfg.obs.globalBinds) obsRules
           );
 
-          desktop.ojuny.dms.plugins.ojunyScreenrecord =
+          desktop.ojuny.dux.plugins.ojunyScreenrecord =
             lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
               {
                 enable = true;
                 src = pluginSrc;
               };
 
-          desktop.ojuny.dms.barConfigs.${cfg.indicator.barId}.rightWidgets.ojunyScreenrecord =
+          desktop.ojuny.dux.barConfigs.${cfg.indicator.barId}.rightWidgets.ojunyScreenrecord =
             lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
               {
                 enabled = true;

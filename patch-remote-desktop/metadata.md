@@ -117,9 +117,9 @@ label follow the new port.
 After a rebuild, check the evaluated settings:
 
 ```sh
-nix eval --json .#nixosConfigurations.<host>.config.desktop.ojuny.dms.plugins.localServices.settings
-nix eval --json .#nixosConfigurations.<host>.config.desktop.ojuny.dms.barConfigs.default.rightWidgets
-nix eval --raw .#nixosConfigurations.<host>.config.desktop.ojuny.dms.plugins.screenCaptureToolbar.settings.showRecPill
+nix eval --json .#nixosConfigurations.<host>.config.desktop.ojuny.dux.plugins.localServices.settings
+nix eval --json .#nixosConfigurations.<host>.config.desktop.ojuny.dux.barConfigs.default.rightWidgets
+nix eval --raw .#nixosConfigurations.<host>.config.desktop.ojuny.dux.plugins.screenCaptureToolbar.settings.showRecPill
 ss -ltnp | grep -E ':(5900|3389)\b'
 ```
 
@@ -158,8 +158,8 @@ the pill should appear while the listener is active.
 
 ## Data and removal
 
-The patch stores no state. The indicator settings are Nix configuration. DMS
-runtime state stays under the user's configuration and state directories.
+The patch stores no state. The indicator settings are Nix configuration. Dux
+Shell runtime state stays under the user's configuration and state directories.
 RustDesk, AnyDesk, TeamViewer, Remmina, and WayVNC keep their own user data.
 
 To remove the patch:

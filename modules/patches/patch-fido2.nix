@@ -425,8 +425,8 @@
             '';
           };
 
-          desktop.ojuny.dms.settings.enableU2f = lib.mkIf cfg.services.lock (lib.mkForce true);
-          desktop.ojuny.dms.settings.u2fMode = lib.mkIf cfg.services.lock (lib.mkForce u2fMode);
+          desktop.ojuny.dux.settings.enableU2f = lib.mkIf cfg.services.lock (lib.mkForce true);
+          desktop.ojuny.dux.settings.u2fMode = lib.mkIf cfg.services.lock (lib.mkForce u2fMode);
         })
       ];
     };

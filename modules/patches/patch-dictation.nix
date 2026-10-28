@@ -524,7 +524,7 @@
             subcat = "Dictation";
           };
 
-          desktop.ojuny.dms.barConfigs.default.rightWidgets.privacyIndicator =
+          desktop.ojuny.dux.barConfigs.default.rightWidgets.privacyIndicator =
             lib.mkIf cfg.indicator.barWidget
               {
                 enabled = true;
