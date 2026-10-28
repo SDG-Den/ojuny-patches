@@ -153,6 +153,31 @@
             default = false;
             description = "Allow server-side agent forwarding.";
           };
+          allowGroups = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = "Groups allowed to log in. Empty allows all groups.";
+          };
+          useDns = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Look up client host names with DNS.";
+          };
+          x11Forwarding = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Allow X11 forwarding.";
+          };
+          allowSftp = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Allow SFTP subsystem access.";
+          };
+          kbdInteractiveAuthentication = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Allow keyboard-interactive authentication.";
+          };
         };
 
         authorizedKeys = lib.mkOption {
@@ -250,6 +275,21 @@
           # @option widget = "switch"; label = "Agent forwarding"; group = "Server"; groupOrder = 20; order = 70; advanced = true; description = "Allow clients to forward their SSH agent to the server."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
           ojuny.patch.ssh-tools.server.allowAgentForwarding = false;
 
+          # @option widget = "list"; label = "Allowed groups"; group = "Server"; groupOrder = 20; order = 80; advanced = true; description = "Groups allowed to log in. Empty allows all groups."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+          ojuny.patch.ssh-tools.server.allowGroups = [ ];
+
+          # @option widget = "switch"; label = "Use DNS"; group = "Server"; groupOrder = 20; order = 90; advanced = true; description = "Look up client host names with DNS."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+          ojuny.patch.ssh-tools.server.useDns = true;
+
+          # @option widget = "switch"; label = "X11 forwarding"; group = "Server"; groupOrder = 20; order = 100; advanced = true; description = "Allow X11 forwarding."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+          ojuny.patch.ssh-tools.server.x11Forwarding = true;
+
+          # @option widget = "switch"; label = "SFTP"; group = "Server"; groupOrder = 20; order = 110; description = "Allow SFTP subsystem access."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+          ojuny.patch.ssh-tools.server.allowSftp = true;
+
+          # @option widget = "switch"; label = "Keyboard-interactive login"; group = "Server"; groupOrder = 20; order = 120; advanced = true; description = "Allow keyboard-interactive authentication."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+          ojuny.patch.ssh-tools.server.kbdInteractiveAuthentication = false;
+
           # @option widget = "table-list"; label = "Authorized keys"; group = "Keys"; groupOrder = 30; order = 10; columns = [ "user" "key" ]; columnTypes = [ "str" "str" ]; description = "Public keys added to each user's authorized_keys. The User page list remains additive."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
           ojuny.patch.ssh-tools.authorizedKeys = [ ];
 
@@ -271,14 +311,19 @@
             enable = true;
             ports = [ cfg.server.port ];
             openFirewall = cfg.server.openFirewall;
+            allowSFTP = cfg.server.allowSftp;
             settings = {
               PasswordAuthentication = cfg.server.passwordAuthentication;
-              KbdInteractiveAuthentication = false;
+              KbdInteractiveAuthentication = cfg.server.kbdInteractiveAuthentication;
               PermitRootLogin = cfg.server.permitRootLogin;
               PubkeyAuthentication = true;
-              X11Forwarding = false;
+              UseDns = cfg.server.useDns;
+              X11Forwarding = cfg.server.x11Forwarding;
               AllowTcpForwarding = cfg.server.allowTcpForwarding;
               AllowAgentForwarding = cfg.server.allowAgentForwarding;
+            }
+            // lib.optionalAttrs (cfg.server.allowGroups != [ ]) {
+              AllowGroups = cfg.server.allowGroups;
             };
           };
 
