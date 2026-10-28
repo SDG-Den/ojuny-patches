@@ -8,10 +8,21 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-remote-desktop =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.remoteDesktop.enable = lib.mkEnableOption "the remote desktop patch";
+
+      # @option widget = "switch"; label = "Remote desktop patch"; group = "Patches"; description = "Install the selected remote desktop clients and the session indicator.";
+      config.ojuny.patch.remoteDesktop.enable = false;
+
+      imports = [ self.modules.nixos.remote-desktop-backend ];
+    };
+
+  flake.modules.nixos.remote-desktop-backend =
     {
       config,
       lib,
@@ -20,7 +31,10 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.remoteDesktop;
+      cfg = config.ojuny.patch.remoteDesktop // {
+        enable = active;
+      };
+      active = config.ojuny.patch.remoteDesktop.enable && (config.ojuny.patches or true);
       apps = config.ojuny.apps.remoteDesktop;
       indicator = cfg.indicator;
 
@@ -77,8 +91,6 @@
     in
     {
       options.ojuny.patch.remoteDesktop = {
-        enable = lib.mkEnableOption "the remote desktop patch";
-
         indicator = {
           enable = lib.mkOption {
             type = lib.types.bool;
@@ -131,21 +143,29 @@
           extraWatches = lib.mkOption {
             type = lib.types.listOf (lib.types.strMatching "[0-9]+(-[0-9]+)?");
             default = [ ];
-            example = [ "8081" "21115-21119" ];
+            example = [
+              "8081"
+              "21115-21119"
+            ];
             description = "Extra localServices range watches. Each entry is a port or a low-high range.";
           };
 
           ignoredPorts = lib.mkOption {
             type = lib.types.listOf lib.types.port;
             default = [ ];
-            example = [ 8081 9000 ];
+            example = [
+              8081
+              9000
+            ];
             description = "TCP ports hidden from localServices discovery and watches.";
           };
 
           labels = lib.mkOption {
             type = lib.types.attrsOf lib.types.str;
             default = { };
-            example = { "5900" = "Work VNC"; };
+            example = {
+              "5900" = "Work VNC";
+            };
             description = "Extra localServices labels keyed by port or range start.";
           };
 
@@ -202,9 +222,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Remote desktop patch"; group = "Patches"; description = "Install the selected remote desktop clients and the session indicator.";
-          ojuny.patch.remoteDesktop.enable = false;
-
           # @option widget = "switch"; label = "Session indicator"; group = "Session indicator"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.remoteDesktop.enable"; visibleWhen.equals = true; description = "Show remote and capture activity in the bar. VNC and RDP appear only while a server is listening.";
           ojuny.patch.remoteDesktop.indicator.enable = true;
 
@@ -265,15 +282,18 @@
         {
           assertions = [
             {
-              assertion = !(watchActive && indicator.vnc) || (indicator.vncPort >= 1000 && indicator.vncPort <= 9999);
+              assertion =
+                !(watchActive && indicator.vnc) || (indicator.vncPort >= 1000 && indicator.vncPort <= 9999);
               message = "patch-remote-desktop: VNC port must be between 1000 and 9999 because localServices only scans TCP ports in that range.";
             }
             {
-              assertion = !(watchActive && indicator.rdp) || (indicator.rdpPort >= 1000 && indicator.rdpPort <= 9999);
+              assertion =
+                !(watchActive && indicator.rdp) || (indicator.rdpPort >= 1000 && indicator.rdpPort <= 9999);
               message = "patch-remote-desktop: RDP port must be between 1000 and 9999 because localServices only scans TCP ports in that range.";
             }
             {
-              assertion = !(watchActive && indicator.vnc && indicator.rdp) || indicator.vncPort != indicator.rdpPort;
+              assertion =
+                !(watchActive && indicator.vnc && indicator.rdp) || indicator.vncPort != indicator.rdpPort;
               message = "patch-remote-desktop: VNC and RDP cannot use the same watch port.";
             }
           ];

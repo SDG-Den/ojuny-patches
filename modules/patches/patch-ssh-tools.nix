@@ -8,17 +8,43 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-ssh-tools =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      ...
+    }:
+    {
+      options.ojuny.patch.ssh-tools.enable = lib.mkEnableOption "the SSH tools patch";
+
+      # @option widget = "switch"; label = "SSH tools"; group = "SSH tools"; groupOrder = 10; order = 10; description = "Install SSH server and client configuration and helpers.";
+      config.ojuny.patch.ssh-tools.enable = false;
+
+      imports = [ self.modules.nixos.ssh-tools-backend ];
+    };
+
+  flake.modules.nixos.ssh-tools-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.ssh-tools;
+      active = config.ojuny.patch.ssh-tools.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.ssh-tools // {
+        enable = active;
+      };
 
       forwardHelper = pkgs.writeShellApplication {
         name = "ojuny-ssh-forward";
-        runtimeInputs = [ pkgs.coreutils pkgs.openssh ];
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.openssh
+        ];
         text = ''
           set -eu
           state="''${XDG_RUNTIME_DIR:-$HOME/.cache}/ojuny-ssh-forward"
@@ -91,8 +117,6 @@
     in
     {
       options.ojuny.patch.ssh-tools = {
-        enable = lib.mkEnableOption "the SSH tools patch";
-
         server = {
           enable = lib.mkEnableOption "the OpenSSH server";
           port = lib.mkOption {
@@ -111,7 +135,11 @@
             description = "Allow password authentication.";
           };
           permitRootLogin = lib.mkOption {
-            type = lib.types.enum [ "no" "prohibit-password" "yes" ];
+            type = lib.types.enum [
+              "no"
+              "prohibit-password"
+              "yes"
+            ];
             default = "no";
             description = "PermitRootLogin value.";
           };
@@ -128,39 +156,60 @@
         };
 
         authorizedKeys = lib.mkOption {
-          type = lib.types.listOf (lib.types.submodule {
-            options = {
-              user = lib.mkOption { type = lib.types.nonEmptyStr; };
-              key = lib.mkOption { type = lib.types.nonEmptyStr; };
-            };
-          });
+          type = lib.types.listOf (
+            lib.types.submodule {
+              options = {
+                user = lib.mkOption { type = lib.types.nonEmptyStr; };
+                key = lib.mkOption { type = lib.types.nonEmptyStr; };
+              };
+            }
+          );
           default = [ ];
           description = "Public keys added to each user's authorized_keys.";
         };
 
         hosts = lib.mkOption {
-          type = lib.types.listOf (lib.types.submodule {
-            options = {
-              alias = lib.mkOption { type = lib.types.nonEmptyStr; };
-              hostName = lib.mkOption { type = lib.types.nonEmptyStr; };
-              user = lib.mkOption { type = lib.types.str; default = ""; };
-              port = lib.mkOption { type = lib.types.port; default = 22; };
-              identityFile = lib.mkOption { type = lib.types.str; default = ""; };
-              proxyJump = lib.mkOption { type = lib.types.str; default = ""; };
-              forwardAgent = lib.mkOption { type = lib.types.bool; default = false; };
-            };
-          });
+          type = lib.types.listOf (
+            lib.types.submodule {
+              options = {
+                alias = lib.mkOption { type = lib.types.nonEmptyStr; };
+                hostName = lib.mkOption { type = lib.types.nonEmptyStr; };
+                user = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                };
+                port = lib.mkOption {
+                  type = lib.types.port;
+                  default = 22;
+                };
+                identityFile = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                };
+                proxyJump = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                };
+                forwardAgent = lib.mkOption {
+                  type = lib.types.bool;
+                  default = false;
+                };
+              };
+            }
+          );
           default = [ ];
           description = "Client host aliases written through programs.ssh.hosts.";
         };
 
         knownHosts = lib.mkOption {
-          type = lib.types.listOf (lib.types.submodule {
-            options = {
-              hostName = lib.mkOption { type = lib.types.nonEmptyStr; };
-              publicKey = lib.mkOption { type = lib.types.nonEmptyStr; };
-            };
-          });
+          type = lib.types.listOf (
+            lib.types.submodule {
+              options = {
+                hostName = lib.mkOption { type = lib.types.nonEmptyStr; };
+                publicKey = lib.mkOption { type = lib.types.nonEmptyStr; };
+              };
+            }
+          );
           default = [ ];
           description = "Optional system-wide known host public keys.";
         };
@@ -180,9 +229,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "SSH tools"; group = "SSH tools"; groupOrder = 10; order = 10; description = "Install SSH server and client configuration and helpers.";
-          ojuny.patch.ssh-tools.enable = false;
-
           # @option widget = "switch"; label = "SSH server"; group = "Server"; groupOrder = 20; order = 10; description = "Run sshd. Off by default; enabling it exposes a network service."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
           ojuny.patch.ssh-tools.server.enable = false;
 
@@ -236,29 +282,36 @@
             };
           };
 
-          users.users = lib.mkMerge (map (entry: {
-            ${entry.user}.openssh.authorizedKeys.keys = [ entry.key ];
-          }) cfg.authorizedKeys);
+          users.users = lib.mkMerge (
+            map (entry: {
+              ${entry.user}.openssh.authorizedKeys.keys = [ entry.key ];
+            }) cfg.authorizedKeys
+          );
 
-          programs.ssh.hosts = lib.listToAttrs (lib.imap1 (index: host: {
-            name = host.alias;
-            value = {
-              order = 100 + index;
-              HostName = host.hostName;
-              Port = host.port;
-              ForwardAgent = host.forwardAgent;
-            } // lib.optionalAttrs (host.user != "") { User = host.user; }
+          programs.ssh.hosts = lib.listToAttrs (
+            lib.imap1 (index: host: {
+              name = host.alias;
+              value = {
+                order = 100 + index;
+                HostName = host.hostName;
+                Port = host.port;
+                ForwardAgent = host.forwardAgent;
+              }
+              // lib.optionalAttrs (host.user != "") { User = host.user; }
               // lib.optionalAttrs (host.identityFile != "") { IdentityFile = host.identityFile; }
               // lib.optionalAttrs (host.proxyJump != "") { ProxyJump = host.proxyJump; };
-          }) cfg.hosts);
+            }) cfg.hosts
+          );
 
-          programs.ssh.knownHosts = lib.listToAttrs (map (host: {
-            name = host.hostName;
-            value = {
-              hostNames = [ host.hostName ];
-              publicKey = host.publicKey;
-            };
-          }) cfg.knownHosts);
+          programs.ssh.knownHosts = lib.listToAttrs (
+            map (host: {
+              name = host.hostName;
+              value = {
+                hostNames = [ host.hostName ];
+                publicKey = host.publicKey;
+              };
+            }) cfg.knownHosts
+          );
 
           programs.ssh.extraConfig = lib.mkIf cfg.keepalive ''
             Host *
@@ -289,7 +342,8 @@
                   lib.length (lib.unique (map (host: host.alias) cfg.hosts)) == lib.length cfg.hosts
                   && lib.all (host: builtins.match "[A-Za-z0-9_.-]+" host.alias != null) cfg.hosts
                   && lib.all (host: builtins.match ".*[[:space:]].*" host.hostName == null) cfg.hosts
-                  && lib.all (host:
+                  && lib.all (
+                    host:
                     builtins.match "[A-Za-z0-9_.-]*" host.user != null
                     && !(lib.hasInfix "\n" host.identityFile)
                     && !(lib.hasInfix "\r" host.identityFile)
@@ -301,7 +355,9 @@
               {
                 assertion =
                   lib.length (lib.unique (map (host: host.hostName) cfg.knownHosts)) == lib.length cfg.knownHosts
-                  && lib.all (host: !(lib.hasInfix "\n" host.publicKey) && !(lib.hasInfix "\r" host.publicKey)) cfg.knownHosts;
+                  && lib.all (
+                    host: !(lib.hasInfix "\n" host.publicKey) && !(lib.hasInfix "\r" host.publicKey)
+                  ) cfg.knownHosts;
                 message = "SSH tools: known host names must be unique and public keys must be single-line.";
               }
             ];

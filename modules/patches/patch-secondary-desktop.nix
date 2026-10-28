@@ -8,7 +8,7 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-secondary-desktop =
@@ -17,13 +17,29 @@
       lib,
       ...
     }:
+    {
+      options.ojuny.patch.secondary-desktop.enable = lib.mkEnableOption "the secondary desktop patch";
+
+      # @option widget = "switch"; label = "Secondary desktop"; group = "Patches"; description = "Expose optional desktop sessions without changing the Mango/DMS session.";
+      config.ojuny.patch.secondary-desktop.enable = false;
+
+      imports = [ self.modules.nixos.secondary-desktop-backend ];
+    };
+
+  flake.modules.nixos.secondary-desktop-backend =
+    {
+      config,
+      lib,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.secondary-desktop;
+      active = config.ojuny.patch.secondary-desktop.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.secondary-desktop // {
+        enable = active;
+      };
     in
     {
       options.ojuny.patch.secondary-desktop = {
-        enable = lib.mkEnableOption "the secondary desktop patch";
-
         plasma = lib.mkEnableOption "the KDE Plasma 6 session";
 
         gnome = lib.mkEnableOption "the GNOME session";
@@ -37,9 +53,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Secondary desktop"; group = "Patches"; description = "Expose optional desktop sessions without changing the Mango/DMS session.";
-          ojuny.patch.secondary-desktop.enable = false;
-
           # @option widget = "switch"; label = "KDE Plasma 6"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add KDE Plasma 6 as a login session. Configure it from Plasma's own settings.";
           ojuny.patch.secondary-desktop.plasma = false;
 

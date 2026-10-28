@@ -8,10 +8,21 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-multi-kernel =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.multi-kernel.enable = lib.mkEnableOption "the multi-kernel patch";
+
+      # @option widget = "switch"; label = "Multi-kernel patch"; group = "Patches"; description = "Enable installing and selecting multiple Linux kernels.";
+      config.ojuny.patch.multi-kernel.enable = false;
+
+      imports = [ self.modules.nixos.multi-kernel-backend ];
+    };
+
+  flake.modules.nixos.multi-kernel-backend =
     {
       config,
       lib,
@@ -19,7 +30,10 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.multi-kernel;
+      cfg = config.ojuny.patch.multi-kernel // {
+        enable = active;
+      };
+      active = config.ojuny.patch.multi-kernel.enable && (config.ojuny.patches or true);
 
       ltsAttempt = builtins.tryEval (pkgs.linuxPackages_lts or null);
       ltsPackages =
@@ -31,25 +45,23 @@
       hardenedAttempt = builtins.tryEval (pkgs.linuxPackages_hardened or null);
       hasHardened = hardenedAttempt.success && hardenedAttempt.value != null;
 
-      kernelSets =
-        {
-          default = pkgs.linuxPackages;
-          latest = pkgs.linuxPackages_latest;
-          lts = ltsPackages;
-          zen = pkgs.linuxPackages_zen;
-        }
-        // lib.optionalAttrs hasHardened {
-          hardened = hardenedAttempt.value;
-        };
+      kernelSets = {
+        default = pkgs.linuxPackages;
+        latest = pkgs.linuxPackages_latest;
+        lts = ltsPackages;
+        zen = pkgs.linuxPackages_zen;
+      }
+      // lib.optionalAttrs hasHardened {
+        hardened = hardenedAttempt.value;
+      };
 
-      available =
-        [
-          "default"
-          "latest"
-          "lts"
-          "zen"
-        ]
-        ++ lib.optional hasHardened "hardened";
+      available = [
+        "default"
+        "latest"
+        "lts"
+        "zen"
+      ]
+      ++ lib.optional hasHardened "hardened";
 
       extras = lib.filter (name: builtins.hasAttr name cfg.kernelPackages) (
         lib.subtractLists [ cfg.selected ] cfg.kernels
@@ -66,8 +78,6 @@
     in
     {
       options.ojuny.patch.multi-kernel = {
-        enable = lib.mkEnableOption "the multi-kernel patch";
-
         selected = lib.mkOption {
           type = lib.types.enum available;
           default = "default";
@@ -103,9 +113,6 @@
       };
 
       config = {
-        # @option widget = "switch"; label = "Multi-kernel patch"; group = "Patches"; description = "Enable installing and selecting multiple Linux kernels.";
-        ojuny.patch.multi-kernel.enable = false;
-
         # @option widget = "dropdown"; label = "Default kernel"; group = "Kernel"; choices = [ "default" "latest" "lts" "zen" ]; visibleWhen.path = "ojuny.patch.multi-kernel.enable"; visibleWhen.equals = true; description = "Kernel used by the next generation. Save and rebuild, then reboot; this does not switch the running kernel.";
         ojuny.patch.multi-kernel.selected = "default";
 

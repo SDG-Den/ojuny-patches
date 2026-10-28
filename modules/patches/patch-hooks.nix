@@ -8,16 +8,39 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-hooks =
-    { config, lib, pkgs, ... }:
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.hooks.enable = lib.mkEnableOption "typed lifecycle hooks";
+
+      # @option widget = "switch"; label = "Hooks"; group = "Hooks"; groupOrder = 10; description = "Enable typed lifecycle hooks with validation, logging and retries.";
+      config.ojuny.patch.hooks.enable = false;
+
+      imports = [ self.modules.nixos.hooks-backend ];
+    };
+
+  flake.modules.nixos.hooks-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.hooks;
+      active = config.ojuny.patch.hooks.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.hooks // {
+        enable = active;
+      };
       patchesEnabled = lib.attrByPath [ "ojuny" "patches" ] true config;
 
-      eventNames = [ "preRebuild" "postBoot" "postUpdate" ];
+      eventNames = [
+        "preRebuild"
+        "postBoot"
+        "postUpdate"
+      ];
 
       hookNamePattern = "[A-Za-z0-9][A-Za-z0-9_-]*";
       envNamePattern = "[A-Za-z_][A-Za-z0-9_]*";
@@ -39,12 +62,18 @@
           command = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];
-            example = [ "/run/current-system/sw/bin/notify-send" "update finished" ];
+            example = [
+              "/run/current-system/sw/bin/notify-send"
+              "update finished"
+            ];
             description = "Command as an argv list. No shell is involved unless the list starts with a shell.";
           };
 
           as = lib.mkOption {
-            type = lib.types.enum [ "root" "user" ];
+            type = lib.types.enum [
+              "root"
+              "user"
+            ];
             default = "root";
             description = "Run the child as root or as the configured user.";
           };
@@ -74,7 +103,10 @@
           };
 
           onFailure = lib.mkOption {
-            type = lib.types.enum [ "abort" "continue" ];
+            type = lib.types.enum [
+              "abort"
+              "continue"
+            ];
             default = "abort";
             description = "For every event, stop the remaining hooks or continue with later hooks.";
           };
@@ -89,19 +121,19 @@
 
       hookEvents = lib.types.attrsOf hookType;
 
-      enabledHooks = event:
-        lib.mapAttrsToList
-          (name: hook: hook // { inherit name; })
-          (lib.filterAttrs (_: hook: hook.enable) cfg.events.${event});
+      enabledHooks =
+        event:
+        lib.mapAttrsToList (name: hook: hook // { inherit name; }) (
+          lib.filterAttrs (_: hook: hook.enable) cfg.events.${event}
+        );
 
-      sortedHooks = event:
-        lib.sort
-          (a: b: a.order < b.order || (a.order == b.order && a.name < b.name))
-          (enabledHooks event);
+      sortedHooks =
+        event:
+        lib.sort (a: b: a.order < b.order || (a.order == b.order && a.name < b.name)) (enabledHooks event);
 
-      allHooks = lib.concatMap
-        (event: map (hook: hook // { inherit event; }) (sortedHooks event))
-        eventNames;
+      allHooks = lib.concatMap (
+        event: map (hook: hook // { inherit event; }) (sortedHooks event)
+      ) eventNames;
 
       logDir = cfg.logging.directory;
       stateDir = "/var/lib/ojuny/hooks";
@@ -112,20 +144,22 @@
 
       unitName = event: name: "ojuny-hook-${lib.toLower event}-${name}.service";
 
-      envArgs = hook:
-        lib.mapAttrsToList (key: value: "${key}=${value}") hook.environment;
+      envArgs = hook: lib.mapAttrsToList (key: value: "${key}=${value}") hook.environment;
 
-      hookArgs = hook:
-        (if hook.as == "user" then
-          [
-            "${pkgs.util-linux}/bin/runuser"
-            "-u"
-            hook.user
-            "--"
-            "${pkgs.coreutils}/bin/env"
-          ]
-        else
-          [ "${pkgs.coreutils}/bin/env" ])
+      hookArgs =
+        hook:
+        (
+          if hook.as == "user" then
+            [
+              "${pkgs.util-linux}/bin/runuser"
+              "-u"
+              hook.user
+              "--"
+              "${pkgs.coreutils}/bin/env"
+            ]
+          else
+            [ "${pkgs.coreutils}/bin/env" ]
+        )
         ++ envArgs hook
         ++ hook.command;
 
@@ -248,7 +282,8 @@
         '';
       };
 
-      mkHookScript = event: hook:
+      mkHookScript =
+        event: hook:
         pkgs.writeShellApplication {
           name = "ojuny-hook-${lib.toLower event}-${hook.name}";
           runtimeInputs = with pkgs; [
@@ -270,46 +305,50 @@
           '';
         };
 
-      hookScripts = lib.genAttrs eventNames
-        (event:
-          lib.listToAttrs
-            (map (hook: lib.nameValuePair hook.name (mkHookScript event hook)) (sortedHooks event)));
+      hookScripts = lib.genAttrs eventNames (
+        event:
+        lib.listToAttrs (
+          map (hook: lib.nameValuePair hook.name (mkHookScript event hook)) (sortedHooks event)
+        )
+      );
 
-      hookUnits = lib.listToAttrs
-        (map
-          (hook: {
-            name = unitName hook.event hook.name;
-            value = {
-              description = "Ojuny ${hook.event} hook ${hook.name}";
-              serviceConfig = {
-                Type = "oneshot";
-                ExecStart = "${hookScripts.${hook.event}.${hook.name}}/bin/ojuny-hook-${lib.toLower hook.event}-${hook.name}";
-                TimeoutStartSec = "${toString (hook.timeoutSeconds * (hook.retries + 1) + hook.retryDelaySeconds * hook.retries + 30)}s";
-                RemainAfterExit = false;
-                Restart = "no";
-                StandardOutput = "journal";
-                StandardError = "journal";
-                SyslogIdentifier = "ojuny-hook-${lib.toLower hook.event}-${hook.name}";
-              };
+      hookUnits = lib.listToAttrs (
+        map (hook: {
+          name = unitName hook.event hook.name;
+          value = {
+            description = "Ojuny ${hook.event} hook ${hook.name}";
+            serviceConfig = {
+              Type = "oneshot";
+              ExecStart = "${
+                hookScripts.${hook.event}.${hook.name}
+              }/bin/ojuny-hook-${lib.toLower hook.event}-${hook.name}";
+              TimeoutStartSec = "${
+                toString (hook.timeoutSeconds * (hook.retries + 1) + hook.retryDelaySeconds * hook.retries + 30)
+              }s";
+              RemainAfterExit = false;
+              Restart = "no";
+              StandardOutput = "journal";
+              StandardError = "journal";
+              SyslogIdentifier = "ojuny-hook-${lib.toLower hook.event}-${hook.name}";
             };
-          })
-          allHooks);
+          };
+        }) allHooks
+      );
 
-      dispatchCase = event:
-        lib.concatMapStringsSep "\n"
-          (hook: ''
-            if [ "$rc" -eq 0 ]; then
-              if systemctl start --wait ${lib.escapeShellArg (unitName event hook.name)}; then
-                :
-              else
-                case ${lib.escapeShellArg hook.onFailure} in
-                  abort) rc=1 ;;
-                  continue) printf 'ojuny-hooks: %s/%s failed; continuing\n' ${lib.escapeShellArg event} ${lib.escapeShellArg hook.name} >&2 ;;
-                esac
-              fi
+      dispatchCase =
+        event:
+        lib.concatMapStringsSep "\n" (hook: ''
+          if [ "$rc" -eq 0 ]; then
+            if systemctl start --wait ${lib.escapeShellArg (unitName event hook.name)}; then
+              :
+            else
+              case ${lib.escapeShellArg hook.onFailure} in
+                abort) rc=1 ;;
+                continue) printf 'ojuny-hooks: %s/%s failed; continuing\n' ${lib.escapeShellArg event} ${lib.escapeShellArg hook.name} >&2 ;;
+              esac
             fi
-          '')
-          (sortedHooks event);
+          fi
+        '') (sortedHooks event);
 
       dispatcher = pkgs.writeShellApplication {
         name = "ojuny-hooks-run";
@@ -492,33 +531,29 @@
       };
 
       hookAssertions =
-        map
-          (hook: {
-            assertion = hook.command != [ ] && (builtins.head hook.command) != "";
-            message = "ojuny.patch.hooks: ${hook.event}/${hook.name} needs a non-empty command argv.";
-          })
-          allHooks
-        ++ map
-          (hook: {
-            assertion = hook.as != "user" || (hook.user != null && hook.user != "" && (builtins.hasAttr hook.user config.users.users));
-            message = "ojuny.patch.hooks: ${hook.event}/${hook.name} sets as = \"user\" but user does not exist.";
-          })
-          allHooks
-        ++ map
-          (hook: {
-            assertion = builtins.all (key: builtins.match envNamePattern key != null) (builtins.attrNames hook.environment);
-            message = "ojuny.patch.hooks: ${hook.event}/${hook.name} has an invalid environment variable name.";
-          })
-          allHooks
-        ++ lib.concatMap
-          (event:
-            lib.mapAttrsToList
-              (name: _: {
-                assertion = builtins.match hookNamePattern name != null;
-                message = "ojuny.patch.hooks: hook name '${name}' in ${event} must match ${hookNamePattern}.";
-              })
-              cfg.events.${event})
-          eventNames
+        map (hook: {
+          assertion = hook.command != [ ] && (builtins.head hook.command) != "";
+          message = "ojuny.patch.hooks: ${hook.event}/${hook.name} needs a non-empty command argv.";
+        }) allHooks
+        ++ map (hook: {
+          assertion =
+            hook.as != "user"
+            || (hook.user != null && hook.user != "" && (builtins.hasAttr hook.user config.users.users));
+          message = "ojuny.patch.hooks: ${hook.event}/${hook.name} sets as = \"user\" but user does not exist.";
+        }) allHooks
+        ++ map (hook: {
+          assertion = builtins.all (key: builtins.match envNamePattern key != null) (
+            builtins.attrNames hook.environment
+          );
+          message = "ojuny.patch.hooks: ${hook.event}/${hook.name} has an invalid environment variable name.";
+        }) allHooks
+        ++ lib.concatMap (
+          event:
+          lib.mapAttrsToList (name: _: {
+            assertion = builtins.match hookNamePattern name != null;
+            message = "ojuny.patch.hooks: hook name '${name}' in ${event} must match ${hookNamePattern}.";
+          }) cfg.events.${event}
+        ) eventNames
         ++ [
           {
             assertion = cfg.logging.directory != "" && lib.hasPrefix "/" cfg.logging.directory;
@@ -528,8 +563,6 @@
     in
     {
       options.ojuny.patch.hooks = {
-        enable = lib.mkEnableOption "typed lifecycle hooks";
-
         events = {
           preRebuild = lib.mkOption {
             type = hookEvents;
@@ -575,13 +608,10 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Hooks"; group = "Hooks"; groupOrder = 10; description = "Enable typed lifecycle hooks with validation, logging and retries.";
-          ojuny.patch.hooks.enable = false;
-
           # @option widget = "raw"; label = "Pre-rebuild hooks"; group = "Events"; groupOrder = 20; order = 10; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run by ojuny-rebuild before nixos-rebuild. Shape: name = { order = 100; command = [ ... ]; as = \"root\"; user = null; timeoutSeconds = 30; retries = 0; retryDelaySeconds = 5; onFailure = \"abort\"; environment = { }; };";
           ojuny.patch.hooks.events.preRebuild = { };
 
-# @option widget = "raw"; label = "Post-boot hooks"; group = "Events"; groupOrder = 20; order = 20; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run once per boot by the post-boot dispatcher.";
+          # @option widget = "raw"; label = "Post-boot hooks"; group = "Events"; groupOrder = 20; order = 20; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run once per boot by the post-boot dispatcher.";
           ojuny.patch.hooks.events.postBoot = { };
 
           # @option widget = "raw"; label = "Post-update hooks"; group = "Events"; groupOrder = 20; order = 30; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run by ojuny-rebuild after a successful activation.";
@@ -603,9 +633,9 @@
         (lib.mkIf (patchesEnabled && cfg.enable) {
           assertions = hookAssertions;
 
-          warnings = lib.optional
-            (cfg.events.preRebuild != { } || cfg.events.postUpdate != { })
-            "ojuny.patch.hooks: preRebuild and postUpdate hooks only run when every rebuild surface calls ojuny-rebuild. Direct nixos-rebuild calls bypass them.";
+          warnings =
+            lib.optional (cfg.events.preRebuild != { } || cfg.events.postUpdate != { })
+              "ojuny.patch.hooks: preRebuild and postUpdate hooks only run when every rebuild surface calls ojuny-rebuild. Direct nixos-rebuild calls bypass them.";
 
           environment.systemPackages = [
             dispatcher
@@ -630,7 +660,15 @@
                 serviceConfig = {
                   Type = "oneshot";
                   ExecStart = "${dispatcher}/bin/ojuny-hooks-run postBoot";
-                  TimeoutStartSec = "${toString (lib.foldl' (total: hook: total + hook.timeoutSeconds * (hook.retries + 1) + hook.retryDelaySeconds * hook.retries + 30) 0 (sortedHooks "postBoot") + 30)}s";
+                  TimeoutStartSec = "${
+                    toString (
+                      lib.foldl' (
+                        total: hook:
+                        total + hook.timeoutSeconds * (hook.retries + 1) + hook.retryDelaySeconds * hook.retries + 30
+                      ) 0 (sortedHooks "postBoot")
+                      + 30
+                    )
+                  }s";
                 };
               };
             }
@@ -642,7 +680,15 @@
                 serviceConfig = {
                   Type = "oneshot";
                   ExecStart = "${pending}/bin/ojuny-hooks-pending";
-                  TimeoutStartSec = "${toString (lib.foldl' (total: hook: total + hook.timeoutSeconds * (hook.retries + 1) + hook.retryDelaySeconds * hook.retries + 30) 0 (sortedHooks "postUpdate") + 30)}s";
+                  TimeoutStartSec = "${
+                    toString (
+                      lib.foldl' (
+                        total: hook:
+                        total + hook.timeoutSeconds * (hook.retries + 1) + hook.retryDelaySeconds * hook.retries + 30
+                      ) 0 (sortedHooks "postUpdate")
+                      + 30
+                    )
+                  }s";
                 };
               };
 

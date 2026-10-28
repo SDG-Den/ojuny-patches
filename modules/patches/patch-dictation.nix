@@ -8,11 +8,22 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
 
   flake.modules.nixos.patch-dictation =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.dictation.enable = lib.mkEnableOption "the dictation patch";
+
+      # @option widget = "switch"; label = "Dictation"; group = "Patch"; groupOrder = 10; order = 10; description = "Enable speech-to-text, the hotkey, and the microphone indicator.";
+      config.ojuny.patch.dictation.enable = false;
+
+      imports = [ self.modules.nixos.dictation-backend ];
+    };
+
+  flake.modules.nixos.dictation-backend =
     {
       config,
       lib,
@@ -20,7 +31,10 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.dictation;
+      cfg = config.ojuny.patch.dictation // {
+        enable = active;
+      };
+      active = config.ojuny.patch.dictation.enable && (config.ojuny.patches or true);
 
       backendType = lib.types.submodule {
         options = {
@@ -57,11 +71,7 @@
         };
       };
 
-      modelValue =
-        if cfg.voxtype.modelFile != null then
-          cfg.voxtype.modelFile
-        else
-          cfg.voxtype.model;
+      modelValue = if cfg.voxtype.modelFile != null then cfg.voxtype.modelFile else cfg.voxtype.model;
 
       voxtypeConfig = pkgs.writeText "ojuny-voxtype-config.toml" ''
         state_file = "auto"
@@ -121,9 +131,18 @@
 
         superwhisper = {
           packages = lib.optional (cfg.superwhisper.package != null) cfg.superwhisper.package;
-          start = [ "superwhisper" "start" ];
-          stop = [ "superwhisper" "stop" ];
-          toggle = [ "superwhisper" "record" ];
+          start = [
+            "superwhisper"
+            "start"
+          ];
+          stop = [
+            "superwhisper"
+            "stop"
+          ];
+          toggle = [
+            "superwhisper"
+            "record"
+          ];
           status = [ ];
           available = [ ];
         };
@@ -150,11 +169,7 @@
       stopCommand = commandOrAdapter "stop" selected.stop;
       toggleCommand = commandOrAdapter "toggle" selected.toggle;
 
-      statusCommand =
-        if selected.status != [ ] then
-          lib.escapeShellArgs selected.status
-        else
-          "";
+      statusCommand = if selected.status != [ ] then lib.escapeShellArgs selected.status else "";
 
       availableCommand =
         if selected.available != [ ] then
@@ -169,13 +184,12 @@
 
       dictation = pkgs.writeShellApplication {
         name = "ojuny-dictation";
-        runtimeInputs =
-          [
-            pkgs.bash
-            pkgs.coreutils
-            pkgs.libnotify
-          ]
-          ++ selected.packages;
+        runtimeInputs = [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.libnotify
+        ]
+        ++ selected.packages;
 
         text = ''
           set -euo pipefail
@@ -306,8 +320,6 @@
     in
     {
       options.ojuny.patch.dictation = {
-        enable = lib.mkEnableOption "the dictation patch";
-
         backend = lib.mkOption {
           type = lib.types.str;
           default = "voxtype";
@@ -328,7 +340,10 @@
           };
           modifier = lib.mkOption {
             type = lib.types.listOf lib.types.str;
-            default = [ "SUPER" "CTRL" ];
+            default = [
+              "SUPER"
+              "CTRL"
+            ];
             description = "Mango modifiers for the dictation toggle.";
           };
           keys = lib.mkOption {
@@ -422,9 +437,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Dictation"; group = "Patch"; groupOrder = 10; order = 10; description = "Enable speech-to-text, the hotkey, and the microphone indicator.";
-          ojuny.patch.dictation.enable = false;
-
           # @option widget = "dropdown"; label = "Backend"; group = "Backend"; groupOrder = 20; order = 10; choices = [ "voxtype" "superwhisper" ]; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Voxtype is local and installed by this patch. Superwhisper is external and needs a package.";
           ojuny.patch.dictation.backend = "voxtype";
 
@@ -462,7 +474,10 @@
           ojuny.patch.dictation.hotkey.enable = true;
 
           # @option widget = "list"; label = "Hotkey modifiers"; group = "Hotkey"; groupOrder = 50; order = 20; visibleWhen.path = "ojuny.patch.dictation.hotkey.enable"; visibleWhen.equals = true; description = "Mango modifier names.";
-          ojuny.patch.dictation.hotkey.modifier = [ "SUPER" "CTRL" ];
+          ojuny.patch.dictation.hotkey.modifier = [
+            "SUPER"
+            "CTRL"
+          ];
 
           # @option widget = "list"; label = "Hotkey keys"; group = "Hotkey"; groupOrder = 50; order = 30; visibleWhen.path = "ojuny.patch.dictation.hotkey.enable"; visibleWhen.equals = true; description = "Mango key names.";
           ojuny.patch.dictation.hotkey.keys = [ "X" ];
@@ -492,13 +507,12 @@
             }
           ];
 
-          environment.systemPackages =
-            [
-              dictation
-              pkgs.wl-clipboard
-              pkgs.ydotool
-            ]
-            ++ selected.packages;
+          environment.systemPackages = [
+            dictation
+            pkgs.wl-clipboard
+            pkgs.ydotool
+          ]
+          ++ selected.packages;
 
           desktop.ojuny.mango.binds.common.ojunyDictation = lib.mkIf cfg.hotkey.enable {
             modifier = cfg.hotkey.modifier;
@@ -532,8 +546,7 @@
             serviceConfig = {
               Type = "simple";
               ExecStart = "${cfg.voxtype.package}/bin/voxtype --config ${voxtypeConfig} daemon";
-              ExecStartPre = lib.optional cfg.voxtype.downloadModel
-                "-${cfg.voxtype.package}/bin/voxtype --config ${voxtypeConfig} setup --download --no-post-install";
+              ExecStartPre = lib.optional cfg.voxtype.downloadModel "-${cfg.voxtype.package}/bin/voxtype --config ${voxtypeConfig} setup --download --no-post-install";
               Restart = "on-failure";
               RestartSec = 5;
             };

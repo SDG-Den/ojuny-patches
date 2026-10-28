@@ -8,16 +8,37 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-emacs =
+    {
+      config,
+      lib,
+      ...
+    }:
+    {
+      options.ojuny.patch.emacs.enable = lib.mkEnableOption "the Emacs patch";
+
+      # @option widget = "switch"; label = "Emacs"; group = "Emacs"; groupOrder = 10; order = 10; description = "Install and configure Emacs with Stylix theming and Eglot language servers."
+      config.ojuny.patch.emacs.enable = false;
+
+      imports = [ self.modules.nixos.emacs-backend ];
+
+      config.home-manager.sharedModules = lib.mkIf (
+        config.ojuny.patch.emacs.enable && (config.ojuny.patches or true)
+      ) [ self.modules.homeManager.emacs-backend ];
+    };
+
+  flake.modules.nixos.emacs-backend =
     { lib, ... }:
     {
       options.ojuny.patch.emacs = {
-        enable = lib.mkEnableOption "the Emacs patch";
         variant = lib.mkOption {
-          type = lib.types.enum [ "pgtk" "gtk" ];
+          type = lib.types.enum [
+            "pgtk"
+            "gtk"
+          ];
           default = "pgtk";
           description = "Emacs build: pgtk for native Wayland, gtk for the X11 build.";
         };
@@ -61,9 +82,6 @@
       };
 
       config = {
-        # @option widget = "switch"; label = "Emacs"; group = "Emacs"; groupOrder = 10; order = 10; description = "Install and configure Emacs with Stylix theming and Eglot language servers."
-        ojuny.patch.emacs.enable = false;
-
         # @option widget = "dropdown"; label = "Package variant"; group = "Package"; groupOrder = 20; order = 10; choices = [ "pgtk" "gtk" ]; visibleWhen.path = "ojuny.patch.emacs.enable"; visibleWhen.equals = true; description = "pgtk is the native Wayland build and is recommended. gtk is the X11 build for compatibility."
         ojuny.patch.emacs.variant = "pgtk";
 
@@ -85,16 +103,27 @@
       };
     };
 
-  flake.modules.homeManager.patch-emacs =
-    { lib, pkgs, osConfig ? { }, ... }:
+  flake.modules.homeManager.emacs-backend =
+    {
+      lib,
+      pkgs,
+      osConfig ? { },
+      ...
+    }:
     let
-      cfg = osConfig.ojuny.patch.emacs or {
-        enable = false;
-        variant = "pgtk";
-        defaultEditor = false;
-        languages = [ ];
-        extraPackages = [ ];
-      };
+      active = (osConfig.ojuny.patch.emacs.enable or false) && (osConfig.ojuny.patches or true);
+      cfg =
+        (osConfig.ojuny.patch.emacs or {
+          enable = false;
+          variant = "pgtk";
+          defaultEditor = false;
+          languages = [ ];
+          extraPackages = [ ];
+        }
+        )
+        // {
+          enable = active;
+        };
 
       package = if cfg.variant == "pgtk" then pkgs.emacs-pgtk else pkgs.emacs;
 
@@ -102,17 +131,26 @@
         nix = {
           mode = "nix-mode";
           server = [ "nixd" ];
-          packages = [ pkgs.nixd pkgs.nixfmt ];
+          packages = [
+            pkgs.nixd
+            pkgs.nixfmt
+          ];
         };
         python = {
           mode = "python-mode";
-          server = [ "pyright-langserver" "--stdio" ];
+          server = [
+            "pyright-langserver"
+            "--stdio"
+          ];
           packages = [ pkgs.pyright ];
         };
         rust = {
           mode = "rust-mode";
           server = [ "rust-analyzer" ];
-          packages = [ pkgs.rust-analyzer pkgs.rustfmt ];
+          packages = [
+            pkgs.rust-analyzer
+            pkgs.rustfmt
+          ];
         };
         c = {
           mode = "c-mode";
@@ -131,7 +169,10 @@
         };
         typescript = {
           mode = "typescript-mode";
-          server = [ "typescript-language-server" "--stdio" ];
+          server = [
+            "typescript-language-server"
+            "--stdio"
+          ];
           packages = [ pkgs.typescript-language-server ];
         };
         lua = {
@@ -141,22 +182,38 @@
         };
         bash = {
           mode = "sh-mode";
-          server = [ "bash-language-server" "start" ];
-          packages = [ pkgs.bash-language-server pkgs.shellcheck pkgs.shfmt ];
+          server = [
+            "bash-language-server"
+            "start"
+          ];
+          packages = [
+            pkgs.bash-language-server
+            pkgs.shellcheck
+            pkgs.shfmt
+          ];
         };
         yaml = {
           mode = "yaml-mode";
-          server = [ "yaml-language-server" "--stdio" ];
+          server = [
+            "yaml-language-server"
+            "--stdio"
+          ];
           packages = [ pkgs.yaml-language-server ];
         };
         json = {
           mode = "json-mode";
-          server = [ "vscode-json-languageserver" "--stdio" ];
+          server = [
+            "vscode-json-languageserver"
+            "--stdio"
+          ];
           packages = [ pkgs.vscode-json-languageserver ];
         };
         markdown = {
           mode = "markdown-mode";
-          server = [ "marksman" "server" ];
+          server = [
+            "marksman"
+            "server"
+          ];
           packages = [ pkgs.marksman ];
         };
       };
@@ -203,9 +260,7 @@
           '';
         };
 
-        home.packages = lib.unique (
-          lib.concatMap (name: languageSpecs.${name}.packages) enabledLanguages
-        );
+        home.packages = lib.unique (lib.concatMap (name: languageSpecs.${name}.packages) enabledLanguages);
 
         stylix.targets.emacs.enable = lib.mkDefault true;
       };

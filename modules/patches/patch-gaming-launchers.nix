@@ -8,9 +8,21 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-gaming-launchers =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.gaming-launchers.enable =
+        lib.mkEnableOption "the Lutris and Heroic gaming launchers patch";
+
+      # @option widget = "switch"; label = "Gaming launchers"; group = "Gaming launchers"; description = "Install Lutris and Heroic with Wine and Proton.";
+      config.ojuny.patch.gaming-launchers.enable = false;
+
+      imports = [ self.modules.nixos.gaming-launchers-backend ];
+    };
+
+  flake.modules.nixos.gaming-launchers-backend =
     {
       config,
       lib,
@@ -18,13 +30,15 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.gaming-launchers;
+      active = config.ojuny.patch.gaming-launchers.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.gaming-launchers // {
+        enable = active;
+      };
 
       launcherEnabled = cfg.lutris.enable || cfg.heroic.enable;
 
       launcherPackages =
-        lib.optionals cfg.lutris.enable [ pkgs.lutris ]
-        ++ lib.optionals cfg.heroic.enable [ pkgs.heroic ];
+        lib.optionals cfg.lutris.enable [ pkgs.lutris ] ++ lib.optionals cfg.heroic.enable [ pkgs.heroic ];
 
       wineTools =
         lib.optionals cfg.wine.winetricks [ pkgs.winetricks ]
@@ -33,12 +47,11 @@
       sharedPackages = [
         pkgs.umu-launcher
         cfg.wine.package
-      ] ++ wineTools;
+      ]
+      ++ wineTools;
     in
     {
       options.ojuny.patch.gaming-launchers = {
-        enable = lib.mkEnableOption "the Lutris and Heroic gaming launchers patch";
-
         lutris.enable = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -80,9 +93,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Gaming launchers"; group = "Gaming launchers"; description = "Install Lutris and Heroic with Wine and Proton.";
-          ojuny.patch.gaming-launchers.enable = false;
-
           # @option widget = "switch"; label = "Lutris"; group = "Launchers"; description = "Install Lutris. It fetches DXVK and VKD3D on first launch."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
           ojuny.patch.gaming-launchers.lutris.enable = true;
 
@@ -102,15 +112,13 @@
           ojuny.patch.gaming-launchers.protonGE = true;
         }
         (lib.mkIf cfg.enable {
-          environment.systemPackages =
-            lib.optionals launcherEnabled (launcherPackages ++ sharedPackages);
+          environment.systemPackages = lib.optionals launcherEnabled (launcherPackages ++ sharedPackages);
 
           hardware.graphics.enable = lib.mkIf launcherEnabled true;
 
-          programs.steam.extraCompatPackages =
-            lib.mkIf (cfg.protonGE && config.programs.steam.enable) [
-              pkgs.proton-ge-bin
-            ];
+          programs.steam.extraCompatPackages = lib.mkIf (cfg.protonGE && config.programs.steam.enable) [
+            pkgs.proton-ge-bin
+          ];
         })
       ];
     };

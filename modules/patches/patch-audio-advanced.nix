@@ -8,14 +8,33 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
 
   flake.modules.nixos.patch-audio-advanced =
-    { config, lib, pkgs, ... }:
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.audio-advanced.enable = lib.mkEnableOption "the advanced audio patch";
+
+      # @option widget = "switch"; label = "Advanced audio"; group = "Advanced audio"; groupOrder = 10; order = 10; description = "Enable the optional advanced audio stack. The core PipeWire module must already be enabled."
+      config.ojuny.patch.audio-advanced.enable = false;
+
+      imports = [ self.modules.nixos.audio-advanced-backend ];
+    };
+
+  flake.modules.nixos.audio-advanced-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.audio-advanced;
+      cfg = config.ojuny.patch.audio-advanced // {
+        enable = active;
+      };
+      active = config.ojuny.patch.audio-advanced.enable && (config.ojuny.patches or true);
 
       jackEnabled = cfg.jack || cfg.wineasio;
 
@@ -86,7 +105,6 @@
     in
     {
       options.ojuny.patch.audio-advanced = {
-        enable = lib.mkEnableOption "the advanced audio patch";
         easyeffects = lib.mkEnableOption "EasyEffects";
         easyeffectsAutostart = lib.mkEnableOption "EasyEffects at user login";
         carla = lib.mkEnableOption "Carla";
@@ -104,7 +122,12 @@
           description = "Apply a fixed PipeWire rate and quantum. System-wide tradeoff.";
         };
         sampleRate = lib.mkOption {
-          type = lib.types.enum [ 44100 48000 88200 96000 ];
+          type = lib.types.enum [
+            44100
+            48000
+            88200
+            96000
+          ];
           default = 48000;
           description = "Default PipeWire clock rate used when low latency is enabled.";
         };
@@ -142,9 +165,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Advanced audio"; group = "Advanced audio"; groupOrder = 10; order = 10; description = "Enable the optional advanced audio stack. The core PipeWire module must already be enabled."
-          ojuny.patch.audio-advanced.enable = false;
-
           # @option widget = "switch"; label = "EasyEffects"; group = "Effects"; groupOrder = 20; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install EasyEffects and its PipeWire effects chain."
           ojuny.patch.audio-advanced.easyeffects = true;
 
@@ -266,8 +286,14 @@
             description = "EasyEffects audio effects service";
             wantedBy = [ "default.target" ];
             unitConfig = {
-              After = [ "pipewire.service" "wireplumber.service" ];
-              PartOf = [ "pipewire.service" "wireplumber.service" ];
+              After = [
+                "pipewire.service"
+                "wireplumber.service"
+              ];
+              PartOf = [
+                "pipewire.service"
+                "wireplumber.service"
+              ];
             };
             serviceConfig = {
               Type = "simple";
@@ -282,7 +308,10 @@
             description = "Ojuny generic speaker tuning filter-chain";
             wantedBy = [ "default.target" ];
             unitConfig = {
-              After = [ "pipewire.service" "wireplumber.service" ];
+              After = [
+                "pipewire.service"
+                "wireplumber.service"
+              ];
               PartOf = [ "pipewire.service" ];
               Requires = [ "pipewire.service" ];
             };
