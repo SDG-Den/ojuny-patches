@@ -8,9 +8,24 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-local-llm =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.local-llm.enable = lib.mkEnableOption "the local LLM patch";
+
+      # @option widget = "switch"; label = "Local LLM"; group = "Local LLM"; description = "Run a local model server. The patch is off by default.";
+      config.ojuny.patch.local-llm.enable = false;
+
+      imports = [ self.modules.nixos.local-llm-backend ];
+
+      config.home-manager.sharedModules = lib.mkIf (
+        config.ojuny.patch.local-llm.enable && (config.ojuny.patches or true)
+      ) [ self.modules.homeManager.local-llm-backend ];
+    };
+
+  flake.modules.nixos.local-llm-backend =
     {
       config,
       lib,
@@ -19,6 +34,7 @@
     }:
     let
       cfg = config.ojuny.patch.local-llm;
+      active = cfg.enable && (config.ojuny.patches or true);
 
       modelSpecs = {
         gemma4-e2b = {
@@ -54,11 +70,7 @@
         else
           preset.name;
 
-      ollamaModel =
-        if cfg.ollamaModel != null then
-          cfg.ollamaModel
-        else
-          preset.ollama;
+      ollamaModel = if cfg.ollamaModel != null then cfg.ollamaModel else preset.ollama;
 
       modelFile =
         if cfg.modelPath != null then
@@ -83,11 +95,13 @@
       templateGpu = config.ojuny.gpu or null;
 
       detectedAcceleration =
-        if builtins.elem templateGpu [
-          "nvidia"
-          "hybrid-intel-nvidia"
-          "hybrid-amd-nvidia"
-        ] then
+        if
+          builtins.elem templateGpu [
+            "nvidia"
+            "hybrid-intel-nvidia"
+            "hybrid-amd-nvidia"
+          ]
+        then
           "cuda"
         else if templateGpu == "amd" then
           "rocm"
@@ -99,7 +113,8 @@
           "cuda"
         else if
           builtins.any (
-            driver: builtins.elem driver [
+            driver:
+            builtins.elem driver [
               "amdgpu"
               "radeon"
             ]
@@ -109,8 +124,7 @@
         else
           "cpu";
 
-      acceleration =
-        if cfg.acceleration == "auto" then detectedAcceleration else cfg.acceleration;
+      acceleration = if cfg.acceleration == "auto" then detectedAcceleration else cfg.acceleration;
 
       effectivePort =
         if cfg.port != null then
@@ -154,17 +168,17 @@
 
       llamaPackage = if cfg.backend == "llama-cpp-turbo" then llamaTurbo else llamaBase;
 
-      ollamaPackage = {
-        cpu = pkgs.ollama-cpu;
-        cuda = pkgs.ollama-cuda;
-        rocm = pkgs.ollama-rocm;
-        vulkan = pkgs.ollama-vulkan;
-      }.${acceleration};
+      ollamaPackage =
+        {
+          cpu = pkgs.ollama-cpu;
+          cuda = pkgs.ollama-cuda;
+          rocm = pkgs.ollama-rocm;
+          vulkan = pkgs.ollama-vulkan;
+        }
+        .${acceleration};
     in
     {
       options.ojuny.patch.local-llm = {
-        enable = lib.mkEnableOption "the local LLM patch";
-
         backend = lib.mkOption {
           type = lib.types.enum [
             "llama-cpp"
@@ -391,9 +405,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Local LLM"; group = "Local LLM"; description = "Run a local model server. The patch is off by default.";
-          ojuny.patch.local-llm.enable = false;
-
           # @option widget = "dropdown"; label = "Backend"; group = "Local LLM"; choices = [ "llama-cpp" "llama-cpp-turbo" "ollama" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama-cpp is the stable nixpkgs package. llama-cpp-turbo uses the pinned turboquant fork. ollama uses the Ollama service.";
           ojuny.patch.local-llm.backend = "llama-cpp";
 
@@ -479,7 +490,7 @@
           ojuny.patch.local-llm.modelId = modelId;
           ojuny.patch.local-llm.effectiveAcceleration = acceleration;
         }
-        (lib.mkIf cfg.enable {
+        (lib.mkIf active {
           assertions = [
             {
               assertion = isLlama || cfg.modelPath == null;
@@ -508,7 +519,8 @@
               sleep-idle-seconds = 60;
               models-preset = modelsIni;
               models-max = 1;
-            } // lib.optionalAttrs (cfg.backend == "llama-cpp-turbo") {
+            }
+            // lib.optionalAttrs (cfg.backend == "llama-cpp-turbo") {
               cache-type-k = "q8_0";
               cache-type-v = "turbo4";
             };
@@ -549,7 +561,7 @@
       ];
     };
 
-  flake.modules.homeManager.patch-local-llm =
+  flake.modules.homeManager.local-llm-backend =
     {
       lib,
       pkgs,
@@ -574,6 +586,7 @@
       };
 
       cfg = fallback // (osConfig.ojuny.patch.local-llm or { });
+      active = cfg.enable && (osConfig.ojuny.patches or true);
 
       effectivePort =
         if cfg.port != null then
@@ -649,9 +662,7 @@
         clangd = [ pkgs.clang-tools ];
       };
 
-      selectedLspPackages = lib.unique (
-        lib.concatMap (name: lspPackages.${name}) cfg.lspServers
-      );
+      selectedLspPackages = lib.unique (lib.concatMap (name: lspPackages.${name}) cfg.lspServers);
 
       troubleshoot = pkgs.writeShellScriptBin "ojuny-troubleshoot" ''
         set -euo pipefail
@@ -673,8 +684,12 @@
       '';
     in
     {
-      config = lib.mkIf (cfg.enable && cfg.harness == "opencode") {
-        home.packages = [ troubleshoot pkgs.pciutils ] ++ lib.optionals cfg.installLsps selectedLspPackages;
+      config = lib.mkIf (active && cfg.harness == "opencode") {
+        home.packages = [
+          troubleshoot
+          pkgs.pciutils
+        ]
+        ++ lib.optionals cfg.installLsps selectedLspPackages;
 
         home.file.".config/opencode/ojuny-local-llm.md".text = cfg.systemPrompt;
 

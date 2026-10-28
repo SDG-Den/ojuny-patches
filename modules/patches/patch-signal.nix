@@ -8,21 +8,41 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-signal =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      ...
+    }:
+    {
+      options.ojuny.patch.signal.enable = lib.mkEnableOption "the Signal Desktop patch";
+
+      # @option widget = "switch"; label = "Signal Desktop patch"; group = "Patches"; description = "Enable the Signal Desktop patch.";
+      config.ojuny.patch.signal.enable = false;
+
+      imports = [ self.modules.nixos.signal-backend ];
+    };
+
+  flake.modules.nixos.signal-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.signal;
+      active = config.ojuny.patch.signal.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.signal // {
+        enable = active;
+      };
 
       launchFlags = lib.filter (flag: flag != "") cfg.extraFlags;
 
       defaultDesktopFile =
-        if lib.versionOlder cfg.package.version "8.0.0" then
-          "signal-desktop.desktop"
-        else
-          "signal.desktop";
+        if lib.versionOlder cfg.package.version "8.0.0" then "signal-desktop.desktop" else "signal.desktop";
 
       signalPackage =
         if launchFlags == [ ] then
@@ -34,17 +54,13 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
             postBuild = ''
               wrapProgram $out/bin/signal-desktop ${
-                lib.concatMapStringsSep " " (
-                  flag: "--add-flags ${lib.escapeShellArg flag}"
-                ) launchFlags
+                lib.concatMapStringsSep " " (flag: "--add-flags ${lib.escapeShellArg flag}") launchFlags
               }
             '';
           };
     in
     {
       options.ojuny.patch.signal = {
-        enable = lib.mkEnableOption "the Signal Desktop patch";
-
         setDefaultUriHandler = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -78,9 +94,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Signal Desktop patch"; group = "Patches"; description = "Enable the Signal Desktop patch.";
-          ojuny.patch.signal.enable = false;
-
           # @option widget = "switch"; label = "Handle sgnl:// links"; group = "Signal"; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Set Signal as the default handler for sgnl:// and signalcaptcha:// links.";
           ojuny.patch.signal.setDefaultUriHandler = true;
 

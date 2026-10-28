@@ -8,9 +8,20 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-home-snapshots =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.home-snapshots.enable = lib.mkEnableOption "scheduled home snapshots";
+
+      # @option widget = "switch"; label = "Home snapshots"; group = "Home snapshots";
+      config.ojuny.patch.home-snapshots.enable = false;
+
+      imports = [ self.modules.nixos.home-snapshots-backend ];
+    };
+
+  flake.modules.nixos.home-snapshots-backend =
     {
       config,
       lib,
@@ -18,12 +29,14 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.home-snapshots;
+      active = config.ojuny.patch.home-snapshots.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.home-snapshots // {
+        enable = active;
+      };
       excludes = map (pattern: "--exclude=${pattern}") cfg.exclude;
     in
     {
       options.ojuny.patch.home-snapshots = {
-        enable = lib.mkEnableOption "scheduled home snapshots";
         repository = lib.mkOption {
           type = lib.types.str;
           default = "/var/lib/ojuny/home-restic";
@@ -70,9 +83,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Home snapshots"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.enable = false;
-
           # @option widget = "text"; label = "Repository"; group = "Home snapshots";
           ojuny.patch.home-snapshots.repository = "/var/lib/ojuny/home-restic";
 

@@ -30,20 +30,35 @@
   placeholders.image.default = "nginx:latest";
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-docker =
     { config, lib, ... }:
+    {
+      options.ojuny.patch.docker.enable = lib.mkEnableOption "the Docker patch";
+
+      # @option widget = "switch"; label = "Docker patch"; group = "Patches"; description = "Enable Docker, rootless mode, pruning and declarative containers.";
+      config.ojuny.patch.docker.enable = lib.mkDefault false;
+
+      imports = [ self.modules.nixos.docker-backend ];
+    };
+
+  flake.modules.nixos.docker-backend =
+    { config, lib, ... }:
     let
-      cfg = config.ojuny.patch.docker;
+      active = config.ojuny.patch.docker.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.docker // {
+        enable = active;
+      };
     in
     {
       options.ojuny.patch.docker = {
-        enable = lib.mkEnableOption "the Docker patch";
-
         mode = lib.mkOption {
-          type = lib.types.enum [ "system" "rootless" ];
+          type = lib.types.enum [
+            "system"
+            "rootless"
+          ];
           default = "system";
           description = "Run the root-owned system daemon or a per-user rootless daemon.";
         };
@@ -84,43 +99,42 @@
         };
 
         containers = lib.mkOption {
-          type = lib.types.attrsOf (lib.types.submodule {
-            options = {
-              image = lib.mkOption {
-                type = lib.types.str;
-                description = "OCI image with tag.";
+          type = lib.types.attrsOf (
+            lib.types.submodule {
+              options = {
+                image = lib.mkOption {
+                  type = lib.types.str;
+                  description = "OCI image with tag.";
+                };
+                ports = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                  description = "Published ports. Prefer 127.0.0.1:host:container.";
+                };
+                volumes = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                  description = "Host:container or named volume mounts.";
+                };
+                environment = lib.mkOption {
+                  type = lib.types.attrsOf lib.types.str;
+                  default = { };
+                  description = "Environment variables.";
+                };
+                autoStart = lib.mkOption {
+                  type = lib.types.bool;
+                  default = true;
+                  description = "Start the container at boot.";
+                };
               };
-              ports = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                default = [ ];
-                description = "Published ports. Prefer 127.0.0.1:host:container.";
-              };
-              volumes = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                default = [ ];
-                description = "Host:container or named volume mounts.";
-              };
-              environment = lib.mkOption {
-                type = lib.types.attrsOf lib.types.str;
-                default = { };
-                description = "Environment variables.";
-              };
-              autoStart = lib.mkOption {
-                type = lib.types.bool;
-                default = true;
-                description = "Start the container at boot.";
-              };
-            };
-          });
+            }
+          );
           default = { };
           description = "Declarative containers managed through virtualisation.oci-containers.";
         };
       };
 
       config = {
-        # @option widget = "switch"; label = "Docker patch"; group = "Patches"; description = "Enable Docker, rootless mode, pruning and declarative containers.";
-        ojuny.patch.docker.enable = lib.mkDefault false;
-
         # @option widget = "dropdown"; label = "Docker mode"; group = "Docker"; choices = [ "system" "rootless" ]; visibleWhen.path = "ojuny.patch.docker.enable"; visibleWhen.equals = true; description = "System runs a root-owned daemon. Rootless runs a per-user daemon; declarative containers are unavailable in rootless mode.";
         ojuny.patch.docker.mode = lib.mkDefault "system";
 
@@ -153,24 +167,44 @@
 
         virtualisation.docker.enable = lib.mkIf (cfg.enable && cfg.mode == "system") true;
         virtualisation.docker.enableOnBoot = lib.mkIf (cfg.enable && cfg.mode == "system") cfg.enableOnBoot;
-        virtualisation.docker.daemon.settings = lib.mkIf (cfg.enable && cfg.mode == "system") cfg.daemonSettings;
-        virtualisation.docker.autoPrune.enable = lib.mkIf (cfg.enable && cfg.mode == "system") cfg.autoPrune.enable;
-        virtualisation.docker.autoPrune.dates = lib.mkIf (cfg.enable && cfg.mode == "system") cfg.autoPrune.dates;
-        virtualisation.docker.autoPrune.flags = lib.mkIf (cfg.enable && cfg.mode == "system") cfg.autoPrune.flags;
-        virtualisation.docker.autoPrune.allVolumes.enable =
-          lib.mkIf (cfg.enable && cfg.mode == "system") (cfg.autoPrune.enable && cfg.autoPrune.allVolumes);
+        virtualisation.docker.daemon.settings = lib.mkIf (
+          cfg.enable && cfg.mode == "system"
+        ) cfg.daemonSettings;
+        virtualisation.docker.autoPrune.enable = lib.mkIf (
+          cfg.enable && cfg.mode == "system"
+        ) cfg.autoPrune.enable;
+        virtualisation.docker.autoPrune.dates = lib.mkIf (
+          cfg.enable && cfg.mode == "system"
+        ) cfg.autoPrune.dates;
+        virtualisation.docker.autoPrune.flags = lib.mkIf (
+          cfg.enable && cfg.mode == "system"
+        ) cfg.autoPrune.flags;
+        virtualisation.docker.autoPrune.allVolumes.enable = lib.mkIf (cfg.enable && cfg.mode == "system") (
+          cfg.autoPrune.enable && cfg.autoPrune.allVolumes
+        );
 
         virtualisation.docker.rootless.enable = lib.mkIf (cfg.enable && cfg.mode == "rootless") true;
-        virtualisation.docker.rootless.setSocketVariable = lib.mkIf (cfg.enable && cfg.mode == "rootless") true;
-        virtualisation.docker.rootless.daemon.settings = lib.mkIf (cfg.enable && cfg.mode == "rootless") cfg.daemonSettings;
+        virtualisation.docker.rootless.setSocketVariable = lib.mkIf (
+          cfg.enable && cfg.mode == "rootless"
+        ) true;
+        virtualisation.docker.rootless.daemon.settings = lib.mkIf (
+          cfg.enable && cfg.mode == "rootless"
+        ) cfg.daemonSettings;
 
-        virtualisation.oci-containers.backend =
-          lib.mkIf (cfg.enable && cfg.mode == "system" && cfg.containers != { }) "docker";
-        virtualisation.oci-containers.containers =
-          lib.mkIf (cfg.enable && cfg.mode == "system")
-            (lib.mapAttrs (_: container: {
-              inherit (container) image ports volumes environment autoStart;
-            }) cfg.containers);
+        virtualisation.oci-containers.backend = lib.mkIf (
+          cfg.enable && cfg.mode == "system" && cfg.containers != { }
+        ) "docker";
+        virtualisation.oci-containers.containers = lib.mkIf (cfg.enable && cfg.mode == "system") (
+          lib.mapAttrs (_: container: {
+            inherit (container)
+              image
+              ports
+              volumes
+              environment
+              autoStart
+              ;
+          }) cfg.containers
+        );
 
         assertions = lib.mkIf (cfg.enable && cfg.mode == "rootless") [
           {

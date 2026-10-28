@@ -8,9 +8,20 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-print-scan =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.print-scan.enable = lib.mkEnableOption "printing and scanning support";
+
+      # @option widget = "switch"; label = "Printing and scanning patch"; group = "Patch"; description = "Enable CUPS printing with optional SANE scanning.";
+      config.ojuny.patch.print-scan.enable = false;
+
+      imports = [ self.modules.nixos.print-scan-backend ];
+    };
+
+  flake.modules.nixos.print-scan-backend =
     {
       config,
       lib,
@@ -18,17 +29,15 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.print-scan;
+      cfg = config.ojuny.patch.print-scan // {
+        enable = active;
+      };
+      active = config.ojuny.patch.print-scan.enable && (config.ojuny.patches or true);
 
-      discovery =
-        cfg.enable
-        && cfg.networkDiscovery
-        && (cfg.printing.enable || cfg.scanning.enable);
+      discovery = cfg.enable && cfg.networkDiscovery && (cfg.printing.enable || cfg.scanning.enable);
     in
     {
       options.ojuny.patch.print-scan = {
-        enable = lib.mkEnableOption "printing and scanning support";
-
         networkDiscovery = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -44,7 +53,10 @@
 
           drivers = lib.mkOption {
             type = lib.types.listOf lib.types.package;
-            default = [ pkgs.gutenprint pkgs.hplip ];
+            default = [
+              pkgs.gutenprint
+              pkgs.hplip
+            ];
             description = "Extra CUPS drivers. Driverless IPP Everywhere printers do not need an entry.";
           };
 
@@ -89,14 +101,14 @@
       };
 
       config = {
-        # @option widget = "switch"; label = "Printing and scanning patch"; group = "Patch"; description = "Enable CUPS printing with optional SANE scanning.";
-        ojuny.patch.print-scan.enable = false;
-
         # @option widget = "switch"; label = "Printing"; group = "Printing"; description = "Enable CUPS and the common printer drivers."; visibleWhen.path = "ojuny.patch.print-scan.enable"; visibleWhen.equals = true;
         ojuny.patch.print-scan.printing.enable = true;
 
         # @option widget = "packages"; label = "Printer drivers"; group = "Printing"; description = "Extra CUPS drivers. Driverless IPP Everywhere printers do not need an entry."; visibleWhen.path = "ojuny.patch.print-scan.printing.enable"; visibleWhen.equals = true;
-        ojuny.patch.print-scan.printing.drivers = [ pkgs.gutenprint pkgs.hplip ];
+        ojuny.patch.print-scan.printing.drivers = [
+          pkgs.gutenprint
+          pkgs.hplip
+        ];
 
         # @option widget = "switch"; label = "Network discovery"; group = "Discovery"; description = "Enable Avahi and nssmdns4 for network printers and scanners. Opens UDP 5353."; visibleWhen.path = "ojuny.patch.print-scan.enable"; visibleWhen.equals = true;
         ojuny.patch.print-scan.networkDiscovery = true;
@@ -121,7 +133,9 @@
 
         services.printing.enable = lib.mkIf (cfg.enable && cfg.printing.enable) true;
         services.printing.drivers = lib.mkIf (cfg.enable && cfg.printing.enable) cfg.printing.drivers;
-        services.printing.openFirewall = lib.mkIf (cfg.enable && cfg.printing.enable) cfg.printing.openFirewall;
+        services.printing.openFirewall = lib.mkIf (
+          cfg.enable && cfg.printing.enable
+        ) cfg.printing.openFirewall;
 
         # Force a real false when the patch is on but printing or discovery is off.
         # Otherwise the NixOS default would inherit config.services.avahi.enable.
@@ -133,7 +147,9 @@
         services.avahi.nssmdns4 = lib.mkIf discovery true;
 
         hardware.sane.enable = lib.mkIf (cfg.enable && cfg.scanning.enable) true;
-        hardware.sane.extraBackends = lib.mkIf (cfg.enable && cfg.scanning.enable) cfg.scanning.extraBackends;
+        hardware.sane.extraBackends = lib.mkIf (
+          cfg.enable && cfg.scanning.enable
+        ) cfg.scanning.extraBackends;
         hardware.sane.openFirewall = lib.mkIf (cfg.enable && cfg.scanning.enable) cfg.scanning.openFirewall;
 
         environment.systemPackages = lib.mkIf (cfg.enable && cfg.scanning.enable) [

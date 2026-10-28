@@ -8,10 +8,21 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-screenrecord =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.screenrecord.enable = lib.mkEnableOption "the screen recording patch";
+
+      # @option widget = "switch"; label = "Screen recording"; group = "Screen recording"; groupOrder = 10; order = 10; description = "Install the GPU screen recorder, replay buffer, webcam overlay and recording indicator."
+      config.ojuny.patch.screenrecord.enable = false;
+
+      imports = [ self.modules.nixos.screenrecord-backend ];
+    };
+
+  flake.modules.nixos.screenrecord-backend =
     {
       config,
       lib,
@@ -19,30 +30,36 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.screenrecord;
+      cfg = config.ojuny.patch.screenrecord // {
+        enable = active;
+      };
+      active = config.ojuny.patch.screenrecord.enable && (config.ojuny.patches or true);
 
-      gpuRecorder = lib.optional
-        (lib.meta.availableOn pkgs.stdenv.hostPlatform pkgs.gpu-screen-recorder)
-        pkgs.gpu-screen-recorder;
+      gpuRecorder = lib.optional (lib.meta.availableOn pkgs.stdenv.hostPlatform pkgs.gpu-screen-recorder) pkgs.gpu-screen-recorder;
 
       wrapper = pkgs.writeShellApplication {
         name = "ojuny-screenrecord";
-        runtimeInputs = with pkgs; [
-          coreutils
-          gnugrep
-          gnused
-          findutils
-          jq
-          slurp
-          pulseaudio
-          libnotify
-          v4l-utils
-          mpv
-          util-linux
-        ]
-        ++ gpuRecorder
-        ++ [ pkgs.wf-recorder ]
-        ++ lib.optionals cfg.audio.levelMeter [ pkgs.cava pkgs.pavucontrol ];
+        runtimeInputs =
+          with pkgs;
+          [
+            coreutils
+            gnugrep
+            gnused
+            findutils
+            jq
+            slurp
+            pulseaudio
+            libnotify
+            v4l-utils
+            mpv
+            util-linux
+          ]
+          ++ gpuRecorder
+          ++ [ pkgs.wf-recorder ]
+          ++ lib.optionals cfg.audio.levelMeter [
+            pkgs.cava
+            pkgs.pavucontrol
+          ];
 
         text = ''
           state_dir="''${XDG_RUNTIME_DIR:-$HOME/.local/state}/ojuny/screenrecord"
@@ -603,23 +620,25 @@
         '';
       };
 
-      pluginJson = pkgs.writeText "plugin.json" (builtins.toJSON {
-        id = "ojunyScreenrecord";
-        name = "Screen recording";
-        description = "Recording indicator and stop control";
-        version = "1.0.0";
-        license = "MIT";
-        author = "ojuny";
-        icon = "fiber_manual_record";
-        type = "composite";
-        capabilities = [ "dankbar-widget" ];
-        components = {
-          widget = "./ScreenrecordWidget.qml";
-        };
-        requires_dms = ">=1.5.0";
-        compositors = [ "mango" ];
-        permissions = [ "process" ];
-      });
+      pluginJson = pkgs.writeText "plugin.json" (
+        builtins.toJSON {
+          id = "ojunyScreenrecord";
+          name = "Screen recording";
+          description = "Recording indicator and stop control";
+          version = "1.0.0";
+          license = "MIT";
+          author = "ojuny";
+          icon = "fiber_manual_record";
+          type = "composite";
+          capabilities = [ "dankbar-widget" ];
+          components = {
+            widget = "./ScreenrecordWidget.qml";
+          };
+          requires_dms = ">=1.5.0";
+          compositors = [ "mango" ];
+          permissions = [ "process" ];
+        }
+      );
 
       pluginQml = pkgs.writeText "ScreenrecordWidget.qml" ''
         import QtQuick
@@ -752,16 +771,21 @@
     in
     {
       options.ojuny.patch.screenrecord = {
-        enable = lib.mkEnableOption "the screen recording patch";
-
         backend = lib.mkOption {
-          type = lib.types.enum [ "auto" "gpu-screen-recorder" "wf-recorder" ];
+          type = lib.types.enum [
+            "auto"
+            "gpu-screen-recorder"
+            "wf-recorder"
+          ];
           default = "auto";
           description = "Recorder backend. auto prefers gpu-screen-recorder and falls back to wf-recorder.";
         };
 
         target = lib.mkOption {
-          type = lib.types.enum [ "region" "fullscreen" ];
+          type = lib.types.enum [
+            "region"
+            "fullscreen"
+          ];
           default = "region";
           description = "Capture target. region opens the slurp picker.";
         };
@@ -840,17 +864,30 @@
             description = "V4L2 device. Empty selects the first capture device.";
           };
           size = lib.mkOption {
-            type = lib.types.enum [ "small" "medium" "large" ];
+            type = lib.types.enum [
+              "small"
+              "medium"
+              "large"
+            ];
             default = "medium";
             description = "Overlay height preset.";
           };
           position = lib.mkOption {
-            type = lib.types.enum [ "top-left" "top-right" "bottom-left" "bottom-right" ];
+            type = lib.types.enum [
+              "top-left"
+              "top-right"
+              "bottom-left"
+              "bottom-right"
+            ];
             default = "bottom-right";
             description = "Overlay position inside the recorded region or active monitor.";
           };
           crop = lib.mkOption {
-            type = lib.types.enum [ "8:9" "1:1" "16:9" ];
+            type = lib.types.enum [
+              "8:9"
+              "1:1"
+              "16:9"
+            ];
             default = "8:9";
             description = "Camera crop shape.";
           };
@@ -876,7 +913,10 @@
             description = "Install the DMS recording indicator.";
           };
           style = lib.mkOption {
-            type = lib.types.enum [ "plugin" "privacy" ];
+            type = lib.types.enum [
+              "plugin"
+              "privacy"
+            ];
             default = "plugin";
             description = "plugin installs the dedicated recording pill. privacy relies on the existing DMS privacy indicator.";
           };
@@ -911,9 +951,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Screen recording"; group = "Screen recording"; groupOrder = 10; order = 10; description = "Install the GPU screen recorder, replay buffer, webcam overlay and recording indicator."
-          ojuny.patch.screenrecord.enable = false;
-
           # @option widget = "dropdown"; label = "Backend"; group = "Capture"; groupOrder = 20; order = 10; choices = [ "auto" "gpu-screen-recorder" "wf-recorder" ]; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "auto prefers gpu-screen-recorder and falls back to wf-recorder. wf-recorder uses CPU encoding and has no replay buffer."
           ojuny.patch.screenrecord.backend = "auto";
 
@@ -1005,12 +1042,14 @@
             }
           ];
 
-          environment.systemPackages = [ wrapper ]
-            ++ lib.optionals cfg.obs.enable [ pkgs.obs-studio ];
+          environment.systemPackages = [ wrapper ] ++ lib.optionals cfg.obs.enable [ pkgs.obs-studio ];
 
           desktop.ojuny.mango.binds.common = lib.mkIf cfg.binds.enable {
             ojunyScreenrecordToggle = {
-              modifier = [ "SUPER" "ALT" ];
+              modifier = [
+                "SUPER"
+                "ALT"
+              ];
               keys = [ "R" ];
               dispatcher = "spawn";
               args = "${wrapper}/bin/ojuny-screenrecord toggle";
@@ -1020,7 +1059,10 @@
             };
 
             ojunyScreenrecordReplayToggle = lib.mkIf cfg.buffer.enable {
-              modifier = [ "SUPER" "ALT" ];
+              modifier = [
+                "SUPER"
+                "ALT"
+              ];
               keys = [ "B" ];
               dispatcher = "spawn";
               args = "${wrapper}/bin/ojuny-screenrecord replay-toggle";
@@ -1030,7 +1072,10 @@
             };
 
             ojunyScreenrecordReplaySave = lib.mkIf cfg.buffer.enable {
-              modifier = [ "SUPER" "ALT" ];
+              modifier = [
+                "SUPER"
+                "ALT"
+              ];
               keys = [ "S" ];
               dispatcher = "spawn";
               args = "${wrapper}/bin/ojuny-screenrecord replay-save";
@@ -1040,7 +1085,10 @@
             };
 
             ojunyScreenrecordWebcam = lib.mkIf cfg.webcam.enable {
-              modifier = [ "SUPER" "ALT" ];
+              modifier = [
+                "SUPER"
+                "ALT"
+              ];
               keys = [ "W" ];
               dispatcher = "spawn";
               args = "${wrapper}/bin/ojuny-screenrecord webcam-toggle";
@@ -1051,16 +1099,15 @@
           };
 
           desktop.ojuny.mango.rules.window_rule = lib.mkAfter (
-            [ overlayRule ]
-            ++ lib.optionals (cfg.obs.enable && cfg.obs.globalBinds) obsRules
+            [ overlayRule ] ++ lib.optionals (cfg.obs.enable && cfg.obs.globalBinds) obsRules
           );
 
-          desktop.ojuny.dms.plugins.ojunyScreenrecord = lib.mkIf
-            (cfg.indicator.enable && cfg.indicator.style == "plugin")
-            {
-              enable = true;
-              src = pluginSrc;
-            };
+          desktop.ojuny.dms.plugins.ojunyScreenrecord =
+            lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
+              {
+                enable = true;
+                src = pluginSrc;
+              };
 
           desktop.ojuny.dms.barConfigs.${cfg.indicator.barId}.rightWidgets.ojunyScreenrecord =
             lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")

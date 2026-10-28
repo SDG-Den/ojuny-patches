@@ -8,13 +8,36 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-transcoding =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      ...
+    }:
+    {
+      options.ojuny.patch.transcoding.enable = lib.mkEnableOption "the transcoding patch";
+
+      # @option widget = "switch"; label = "Transcoding"; group = "Patches"; description = "Install ojuny-transcode and add it to the Ojuny menu.";
+      config.ojuny.patch.transcoding.enable = false;
+
+      imports = [ self.modules.nixos.transcoding-backend ];
+    };
+
+  flake.modules.nixos.transcoding-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.transcoding;
+      active = config.ojuny.patch.transcoding.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.transcoding // {
+        enable = active;
+      };
 
       transcode = pkgs.writeShellApplication {
         name = "ojuny-transcode";
@@ -307,47 +330,37 @@
       };
     in
     {
-      options.ojuny.patch.transcoding = {
-        enable = lib.mkEnableOption "the transcoding patch";
-      };
+      config = lib.mkIf cfg.enable {
+        environment.systemPackages = [ transcode ];
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "Transcoding"; group = "Patches"; description = "Install ojuny-transcode and add it to the Ojuny menu.";
-          ojuny.patch.transcoding.enable = false;
-        }
-        (lib.mkIf cfg.enable {
-          environment.systemPackages = [ transcode ];
-
-          desktop.ojuny.dankMenu.menu = {
-            "trigger.transcode" = {
-              icon = "movie_edit";
-              label = "Transcode";
-              aliases = [
-                "transcode"
-                "convert"
-              ];
-            };
-            "trigger.transcode.media" = {
-              icon = "perm_media";
-              label = "Transcode Media";
-              aliases = [
-                "image"
-                "video"
-              ];
-              action = "ghostty -e ${transcode}/bin/ojuny-transcode interactive";
-            };
-            "trigger.transcode.ascii" = {
-              icon = "text_fields";
-              label = "Image to Text";
-              aliases = [
-                "ascii"
-                "art"
-              ];
-              action = "ghostty -e ${transcode}/bin/ojuny-transcode interactive";
-            };
+        desktop.ojuny.dankMenu.menu = {
+          "trigger.transcode" = {
+            icon = "movie_edit";
+            label = "Transcode";
+            aliases = [
+              "transcode"
+              "convert"
+            ];
           };
-        })
-      ];
+          "trigger.transcode.media" = {
+            icon = "perm_media";
+            label = "Transcode Media";
+            aliases = [
+              "image"
+              "video"
+            ];
+            action = "ghostty -e ${transcode}/bin/ojuny-transcode interactive";
+          };
+          "trigger.transcode.ascii" = {
+            icon = "text_fields";
+            label = "Image to Text";
+            aliases = [
+              "ascii"
+              "art"
+            ];
+            action = "ghostty -e ${transcode}/bin/ojuny-transcode interactive";
+          };
+        };
+      };
     };
 }

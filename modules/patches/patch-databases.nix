@@ -8,15 +8,38 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-databases =
-    { config, lib, pkgs, ... }:
-    let
-      cfg = config.ojuny.patch.databases;
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.databases.enable = lib.mkEnableOption "the local databases patch";
 
-      engineNames = [ "postgres" "mariadb" "redis" ];
+      # @option widget = "switch"; label = "Databases"; group = "Databases"; description = "Run local PostgreSQL, MariaDB and Redis containers. Data is stored in Docker volumes and persists across rebuilds.";
+      config.ojuny.patch.databases.enable = false;
+
+      imports = [ self.modules.nixos.databases-backend ];
+    };
+
+  flake.modules.nixos.databases-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+    let
+      cfg = config.ojuny.patch.databases // {
+        enable = active;
+      };
+      active = config.ojuny.patch.databases.enable && (config.ojuny.patches or true);
+
+      engineNames = [
+        "postgres"
+        "mariadb"
+        "redis"
+      ];
       enabledEngines = lib.filter (name: cfg.${name}.enable) engineNames;
 
       runtimeDir = "/run/ojuny-databases";
@@ -24,23 +47,31 @@
       unitName = engine: "docker-${containerName engine}.service";
 
       postgresPassword =
-        if cfg.postgres.passwordFile != "" then cfg.postgres.passwordFile
-        else "${cfg.credentialDir}/postgres.password";
+        if cfg.postgres.passwordFile != "" then
+          cfg.postgres.passwordFile
+        else
+          "${cfg.credentialDir}/postgres.password";
 
       mariadbPassword =
-        if cfg.mariadb.passwordFile != "" then cfg.mariadb.passwordFile
-        else "${cfg.credentialDir}/mariadb.password";
+        if cfg.mariadb.passwordFile != "" then
+          cfg.mariadb.passwordFile
+        else
+          "${cfg.credentialDir}/mariadb.password";
 
       mariadbRootPassword =
-        if cfg.mariadb.rootPasswordFile != "" then cfg.mariadb.rootPasswordFile
-        else "${cfg.credentialDir}/mariadb-root.password";
+        if cfg.mariadb.rootPasswordFile != "" then
+          cfg.mariadb.rootPasswordFile
+        else
+          "${cfg.credentialDir}/mariadb-root.password";
 
       redisPassword =
-        if cfg.redis.passwordFile != "" then cfg.redis.passwordFile
-        else "${cfg.credentialDir}/redis.password";
+        if cfg.redis.passwordFile != "" then
+          cfg.redis.passwordFile
+        else
+          "${cfg.credentialDir}/redis.password";
 
-      validPasswordPath = path:
-        path == "" || (lib.hasPrefix "/" path && !lib.hasPrefix "/nix/store/" path);
+      validPasswordPath =
+        path: path == "" || (lib.hasPrefix "/" path && !lib.hasPrefix "/nix/store/" path);
 
       validVolume = name: builtins.match "[A-Za-z0-9][A-Za-z0-9_.-]*" name != null;
 
@@ -107,15 +138,23 @@
         ${pkgs.coreutils}/bin/install -d -m 0700 -o root -g root ${lib.escapeShellArg cfg.credentialDir}
         ${pkgs.coreutils}/bin/install -d -m 0750 -o root -g ${lib.escapeShellArg cfg.credentialGroup} ${runtimeDir}
 
-        ${lib.optionalString (cfg.postgres.enable && cfg.postgres.passwordFile == "") (ensureGenerated postgresPassword)}
+        ${lib.optionalString (cfg.postgres.enable && cfg.postgres.passwordFile == "") (
+          ensureGenerated postgresPassword
+        )}
         ${lib.optionalString cfg.postgres.enable (prepare "postgres" "password" postgresPassword)}
 
-        ${lib.optionalString (cfg.mariadb.enable && cfg.mariadb.passwordFile == "") (ensureGenerated mariadbPassword)}
-        ${lib.optionalString (cfg.mariadb.enable && cfg.mariadb.rootPasswordFile == "") (ensureGenerated mariadbRootPassword)}
+        ${lib.optionalString (cfg.mariadb.enable && cfg.mariadb.passwordFile == "") (
+          ensureGenerated mariadbPassword
+        )}
+        ${lib.optionalString (cfg.mariadb.enable && cfg.mariadb.rootPasswordFile == "") (
+          ensureGenerated mariadbRootPassword
+        )}
         ${lib.optionalString cfg.mariadb.enable (prepare "mariadb" "password" mariadbPassword)}
         ${lib.optionalString cfg.mariadb.enable (prepare "mariadb" "root-password" mariadbRootPassword)}
 
-        ${lib.optionalString (cfg.redis.enable && cfg.redis.passwordFile == "") (ensureGenerated redisPassword)}
+        ${lib.optionalString (cfg.redis.enable && cfg.redis.passwordFile == "") (
+          ensureGenerated redisPassword
+        )}
         ${lib.optionalString cfg.redis.enable (prepare "redis" "password" redisPassword)}
         ${lib.optionalString cfg.redis.enable redisCheck}
         ${lib.optionalString cfg.redis.enable redisConfig}
@@ -169,8 +208,6 @@
     in
     {
       options.ojuny.patch.databases = {
-        enable = lib.mkEnableOption "the local databases patch";
-
         credentialDir = lib.mkOption {
           type = lib.types.str;
           default = "/var/lib/ojuny/databases";
@@ -300,9 +337,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Databases"; group = "Databases"; description = "Run local PostgreSQL, MariaDB and Redis containers. Data is stored in Docker volumes and persists across rebuilds.";
-          ojuny.patch.databases.enable = false;
-
           # @option widget = "path"; label = "Credential directory"; group = "Advanced"; hidden = true; description = "Root-only directory for generated database passwords.";
           ojuny.patch.databases.credentialDir = "/var/lib/ojuny/databases";
 
@@ -380,7 +414,10 @@
               message = "patch-databases supports only the docker oci-containers backend";
             }
             {
-              assertion = lib.hasPrefix "/" cfg.credentialDir && cfg.credentialDir != "/" && !lib.hasPrefix "/nix/store/" cfg.credentialDir;
+              assertion =
+                lib.hasPrefix "/" cfg.credentialDir
+                && cfg.credentialDir != "/"
+                && !lib.hasPrefix "/nix/store/" cfg.credentialDir;
               message = "ojuny.patch.databases.credentialDir must be an absolute path outside / and the Nix store";
             }
             {
@@ -470,7 +507,10 @@
                   "${cfg.redis.volume}:/data"
                   "${runtimeDir}/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro"
                 ];
-                cmd = [ "redis-server" "/usr/local/etc/redis/redis.conf" ];
+                cmd = [
+                  "redis-server"
+                  "/usr/local/etc/redis/redis.conf"
+                ];
                 autoStart = true;
               };
             })
@@ -492,12 +532,13 @@
                 wantedBy = [ "multi-user.target" ];
                 before = map unitName enabledEngines;
                 after = [ "local-fs.target" ];
-                unitConfig.RequiresMountsFor =
-                  [ cfg.credentialDir ]
-                  ++ lib.optional (cfg.postgres.passwordFile != "") cfg.postgres.passwordFile
-                  ++ lib.optional (cfg.mariadb.passwordFile != "") cfg.mariadb.passwordFile
-                  ++ lib.optional (cfg.mariadb.rootPasswordFile != "") cfg.mariadb.rootPasswordFile
-                  ++ lib.optional (cfg.redis.passwordFile != "") cfg.redis.passwordFile;
+                unitConfig.RequiresMountsFor = [
+                  cfg.credentialDir
+                ]
+                ++ lib.optional (cfg.postgres.passwordFile != "") cfg.postgres.passwordFile
+                ++ lib.optional (cfg.mariadb.passwordFile != "") cfg.mariadb.passwordFile
+                ++ lib.optional (cfg.mariadb.rootPasswordFile != "") cfg.mariadb.rootPasswordFile
+                ++ lib.optional (cfg.redis.passwordFile != "") cfg.redis.passwordFile;
                 serviceConfig = {
                   Type = "oneshot";
                   RemainAfterExit = true;
@@ -507,12 +548,14 @@
               };
             })
 
-            (lib.mkMerge (map (engine: {
-              "${unitName engine}" = {
-                requires = [ "ojuny-databases-credentials.service" ];
-                after = [ "ojuny-databases-credentials.service" ];
-              };
-            }) enabledEngines))
+            (lib.mkMerge (
+              map (engine: {
+                "${unitName engine}" = {
+                  requires = [ "ojuny-databases-credentials.service" ];
+                  after = [ "ojuny-databases-credentials.service" ];
+                };
+              }) enabledEngines
+            ))
           ];
         })
       ];

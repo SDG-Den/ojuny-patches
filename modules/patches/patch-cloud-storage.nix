@@ -8,10 +8,29 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-cloud-storage =
+    {
+      config,
+      lib,
+      ...
+    }:
+    {
+      options.ojuny.patch.cloud-storage.enable = lib.mkEnableOption "the cloud storage patch";
+
+      # @option widget = "switch"; label = "Cloud storage"; group = "Cloud storage"; description = "Enable the cloud storage patch."
+      config.ojuny.patch.cloud-storage.enable = false;
+
+      imports = [ self.modules.nixos.cloud-storage-backend ];
+
+      config.home-manager.sharedModules = lib.mkIf (
+        config.ojuny.patch.cloud-storage.enable && (config.ojuny.patches or true)
+      ) [ self.modules.homeManager.cloud-storage-backend ];
+    };
+
+  flake.modules.nixos.cloud-storage-backend =
     {
       config,
       lib,
@@ -19,13 +38,14 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.cloud-storage;
+      active = config.ojuny.patch.cloud-storage.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.cloud-storage // {
+        enable = active;
+      };
       greetdEnabled = (config.services ? greetd) && config.services.greetd.enable;
     in
     {
       options.ojuny.patch.cloud-storage = {
-        enable = lib.mkEnableOption "the cloud storage patch";
-
         provider = lib.mkOption {
           type = lib.types.enum [
             "nextcloud"
@@ -100,9 +120,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Cloud storage"; group = "Cloud storage"; description = "Enable the cloud storage patch."
-          ojuny.patch.cloud-storage.enable = false;
-
           # @option widget = "dropdown"; label = "Provider"; group = "Cloud storage"; choices = [ "nextcloud" "owncloud" "opencloud" "seafile" ]; description = "FOSS cloud provider and desktop client."; visibleWhen.path = "ojuny.patch.cloud-storage.enable"; visibleWhen.equals = true;
           ojuny.patch.cloud-storage.provider = "nextcloud";
 
@@ -130,22 +147,19 @@
               message = "ojuny.patch.cloud-storage.nextcloud.serverUrl must be empty or start with http:// or https://.";
             }
             {
-              assertion =
-                cfg.nextcloud.localFolder == ""
-                || lib.hasPrefix "/" cfg.nextcloud.localFolder;
+              assertion = cfg.nextcloud.localFolder == "" || lib.hasPrefix "/" cfg.nextcloud.localFolder;
               message = "ojuny.patch.cloud-storage.nextcloud.localFolder must be empty or an absolute path.";
             }
           ];
 
           services.gnome.gnome-keyring.enable = lib.mkIf cfg.keyring true;
           security.pam.services.login.enableGnomeKeyring = lib.mkIf cfg.keyring true;
-          security.pam.services.greetd.enableGnomeKeyring =
-            lib.mkIf (cfg.keyring && greetdEnabled) true;
+          security.pam.services.greetd.enableGnomeKeyring = lib.mkIf (cfg.keyring && greetdEnabled) true;
         })
       ];
     };
 
-  flake.modules.homeManager.patch-cloud-storage =
+  flake.modules.homeManager.cloud-storage-backend =
     {
       config,
       lib,
@@ -153,7 +167,10 @@
       ...
     }:
     let
-      cfg = osConfig.ojuny.patch.cloud-storage;
+      active = (osConfig.ojuny.patch.cloud-storage.enable or false) && (osConfig.ojuny.patches or true);
+      cfg = osConfig.ojuny.patch.cloud-storage // {
+        enable = active;
+      };
 
       mkClientUnit =
         {
@@ -169,28 +186,22 @@
             After = [ "graphical-session.target" ];
             PartOf = [ "graphical-session.target" ];
           };
-          Service =
-            {
-              Environment = [ "PATH=${config.home.profileDirectory}/bin" ];
-              ExecStart = lib.concatStringsSep " " (
-                [ "${package}/bin/${binary}" ] ++ args
-              );
-              Restart = "on-failure";
-              RestartSec = "5s";
-              KillMode = "process";
-              NoNewPrivileges = true;
-              RestrictRealtime = true;
-            }
-            // lib.optionalAttrs (stopArgs != [ ]) {
-              ExecStop = lib.concatStringsSep " " (
-                [ "${package}/bin/${binary}" ] ++ stopArgs
-              );
-            };
+          Service = {
+            Environment = [ "PATH=${config.home.profileDirectory}/bin" ];
+            ExecStart = lib.concatStringsSep " " ([ "${package}/bin/${binary}" ] ++ args);
+            Restart = "on-failure";
+            RestartSec = "5s";
+            KillMode = "process";
+            NoNewPrivileges = true;
+            RestrictRealtime = true;
+          }
+          // lib.optionalAttrs (stopArgs != [ ]) {
+            ExecStop = lib.concatStringsSep " " ([ "${package}/bin/${binary}" ] ++ stopArgs);
+          };
           Install.WantedBy = [ "graphical-session.target" ];
         };
 
-      nextcloudPrefill =
-        cfg.nextcloud.serverUrl != "" || cfg.nextcloud.localFolder != "";
+      nextcloudPrefill = cfg.nextcloud.serverUrl != "" || cfg.nextcloud.localFolder != "";
     in
     {
       config = lib.mkIf cfg.enable {

@@ -8,10 +8,22 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-advanced-hardware-tools =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.advanced-hardware-tools.enable =
+        lib.mkEnableOption "the advanced hardware tools patch";
+
+      # @option widget = "switch"; label = "Advanced hardware tools"; group = "Advanced hardware"; description = "Enable CPU scaling, touchpad haptics and thermal control independently.";
+      config.ojuny.patch.advanced-hardware-tools.enable = false;
+
+      imports = [ self.modules.nixos.advanced-hardware-tools-backend ];
+    };
+
+  flake.modules.nixos.advanced-hardware-tools-backend =
     {
       config,
       lib,
@@ -19,7 +31,10 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.advanced-hardware-tools;
+      cfg = config.ojuny.patch.advanced-hardware-tools // {
+        enable = active;
+      };
+      active = config.ojuny.patch.advanced-hardware-tools.enable && (config.ojuny.patches or true);
 
       facter = config.hardware.facter.report;
       facterCpus = facter.hardware.cpu or [ ];
@@ -42,14 +57,15 @@
           "none";
 
       hapticsReady =
-        hapticsDevice == "asus-proart-p14"
-        || (hapticsDevice == "dell-xps" && cfg.haptics.package != null);
+        hapticsDevice == "asus-proart-p14" || (hapticsDevice == "dell-xps" && cfg.haptics.package != null);
 
-      hapticsStrength = {
-        low = 10;
-        mid = 50;
-        high = 100;
-      }.${cfg.haptics.strength};
+      hapticsStrength =
+        {
+          low = 10;
+          mid = 50;
+          high = 100;
+        }
+        .${cfg.haptics.strength};
 
       fanGate = pkgs.writeShellScript "ojuny-thermald-gate" ''
         set -eu
@@ -67,8 +83,6 @@
     in
     {
       options.ojuny.patch.advanced-hardware-tools = {
-        enable = lib.mkEnableOption "the advanced hardware tools patch";
-
         cpu = {
           enable = lib.mkEnableOption "CPU governor and energy preference control";
 
@@ -192,9 +206,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Advanced hardware tools"; group = "Advanced hardware"; description = "Enable CPU scaling, touchpad haptics and thermal control independently.";
-          ojuny.patch.advanced-hardware-tools.enable = false;
-
           # @option widget = "switch"; label = "CPU scaling"; group = "CPU"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "Set the CPU frequency governor and, optionally, the energy performance preference.";
           ojuny.patch.advanced-hardware-tools.cpu.enable = false;
 
@@ -240,15 +251,16 @@
         {
           assertions = [
             {
-              assertion = !(
-                cfg.enable
-                && cfg.cpu.enable
-                && (
-                  config.services.power-profiles-daemon.enable
-                  || config.services.auto-cpufreq.enable
-                  || config.services.tlp.enable
-                )
-              );
+              assertion =
+                !(
+                  cfg.enable
+                  && cfg.cpu.enable
+                  && (
+                    config.services.power-profiles-daemon.enable
+                    || config.services.auto-cpufreq.enable
+                    || config.services.tlp.enable
+                  )
+                );
               message = "patch-advanced-hardware-tools: CPU scaling conflicts with power-profiles-daemon, auto-cpufreq, and TLP. Disable one owner.";
             }
             {
@@ -256,28 +268,18 @@
               message = "patch-advanced-hardware-tools: haptics.enable requires a detected or explicitly selected supported touchpad, and a package for Dell XPS.";
             }
             {
-              assertion = !(
-                cfg.enable
-                && cfg.fan.enable
-                && cfg.fan.mode == "fancontrol"
-                && cfg.fan.fancontrolConfig == ""
-              );
+              assertion =
+                !(cfg.enable && cfg.fan.enable && cfg.fan.mode == "fancontrol" && cfg.fan.fancontrolConfig == "");
               message = "patch-advanced-hardware-tools: fan.mode = fancontrol requires fan.fancontrolConfig.";
             }
             {
-              assertion = !(
-                cfg.enable
-                && cfg.fan.enable
-                && cfg.fan.mode == "thermald"
-                && !fanDetected
-              );
+              assertion = !(cfg.enable && cfg.fan.enable && cfg.fan.mode == "thermald" && !fanDetected);
               message = "patch-advanced-hardware-tools: fan.mode = thermald requires an Intel CPU. Use fancontrol for an explicit custom curve.";
             }
           ];
         }
         (lib.mkIf (cfg.enable && cfg.cpu.enable) {
-          powerManagement.cpuFreqGovernor =
-            if cfg.cpu.governor == "kernel" then null else cfg.cpu.governor;
+          powerManagement.cpuFreqGovernor = if cfg.cpu.governor == "kernel" then null else cfg.cpu.governor;
 
           systemd.services.ojuny-cpu-epp = lib.mkIf (cfg.cpu.epp != "default") {
             description = "Set CPU energy performance preference";
@@ -323,19 +325,21 @@
             "L+ /var/lib/ojuny-haptics/.config/omarchy/dell-haptic.conf - - - - /etc/ojuny-dell-haptic.conf"
           ];
 
-          systemd.services.ojuny-haptics = lib.mkIf (hapticsDevice == "dell-xps" && cfg.haptics.package != null) {
-            description = "Dell XPS touchpad haptics";
-            wantedBy = [ "multi-user.target" ];
-            after = [ "systemd-udev-settle.service" ];
-            unitConfig.ConditionPathExists = "/sys/bus/i2c/devices/i2c-VEN_06CB:00";
-            environment.DELL_XPS_TOUCHPAD_HAPTICS_HOME = "/var/lib/ojuny-haptics";
-            restartTriggers = [ config.environment.etc."ojuny-dell-haptic.conf".source ];
-            serviceConfig = {
-              ExecStart = "${cfg.haptics.package}/bin/dell-xps-touchpad-haptics-daemon";
-              Restart = "on-failure";
-              RestartSec = 2;
-            };
-          };
+          systemd.services.ojuny-haptics =
+            lib.mkIf (hapticsDevice == "dell-xps" && cfg.haptics.package != null)
+              {
+                description = "Dell XPS touchpad haptics";
+                wantedBy = [ "multi-user.target" ];
+                after = [ "systemd-udev-settle.service" ];
+                unitConfig.ConditionPathExists = "/sys/bus/i2c/devices/i2c-VEN_06CB:00";
+                environment.DELL_XPS_TOUCHPAD_HAPTICS_HOME = "/var/lib/ojuny-haptics";
+                restartTriggers = [ config.environment.etc."ojuny-dell-haptic.conf".source ];
+                serviceConfig = {
+                  ExecStart = "${cfg.haptics.package}/bin/dell-xps-touchpad-haptics-daemon";
+                  Restart = "on-failure";
+                  RestartSec = 2;
+                };
+              };
         })
         (lib.mkIf (cfg.enable && cfg.fan.enable) {
           services.thermald = lib.mkIf (cfg.fan.mode == "thermald" && fanDetected) {
@@ -343,8 +347,9 @@
             ignoreCpuidCheck = cfg.fan.ignoreCpuidCheck;
           };
 
-          systemd.services.thermald.serviceConfig.ExecCondition =
-            lib.mkIf (cfg.fan.mode == "thermald" && fanDetected) fanGate;
+          systemd.services.thermald.serviceConfig.ExecCondition = lib.mkIf (
+            cfg.fan.mode == "thermald" && fanDetected
+          ) fanGate;
 
           hardware.fancontrol = lib.mkIf (cfg.fan.mode == "fancontrol") {
             enable = true;

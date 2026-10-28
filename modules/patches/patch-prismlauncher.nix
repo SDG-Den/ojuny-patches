@@ -8,9 +8,20 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-prismlauncher =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.prismlauncher.enable = lib.mkEnableOption "the Prism Launcher patch";
+
+      # @option widget = "switch"; label = "Prism Launcher"; group = "Minecraft"; description = "Install Prism Launcher. Instances, Java, and modloaders are managed inside Prism.";
+      config.ojuny.patch.prismlauncher.enable = false;
+
+      imports = [ self.modules.nixos.prismlauncher-backend ];
+    };
+
+  flake.modules.nixos.prismlauncher-backend =
     {
       config,
       lib,
@@ -18,7 +29,10 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.prismlauncher;
+      cfg = config.ojuny.patch.prismlauncher // {
+        enable = active;
+      };
+      active = config.ojuny.patch.prismlauncher.enable && (config.ojuny.patches or true);
 
       prismlauncherPackage = pkgs.prismlauncher.override {
         inherit (cfg) msaClientID;
@@ -27,13 +41,12 @@
           pkgs.jdk21
           pkgs.jdk17
           pkgs.jdk8
-        ] ++ cfg.extraJdks;
+        ]
+        ++ cfg.extraJdks;
       };
     in
     {
       options.ojuny.patch.prismlauncher = {
-        enable = lib.mkEnableOption "the Prism Launcher patch";
-
         extraJdks = lib.mkOption {
           type = lib.types.listOf lib.types.package;
           default = [ ];
@@ -48,9 +61,6 @@
       };
 
       config = {
-        # @option widget = "switch"; label = "Prism Launcher"; group = "Minecraft"; description = "Install Prism Launcher. Instances, Java, and modloaders are managed inside Prism.";
-        ojuny.patch.prismlauncher.enable = false;
-
         # @option widget = "packages"; label = "Extra Java runtimes"; group = "Java"; description = "Add Java runtimes to Prism's per-instance Java list. JDK 8, 17, 21, and 25 are bundled."; advanced = true; visibleWhen.path = "ojuny.patch.prismlauncher.enable"; visibleWhen.equals = true;
         ojuny.patch.prismlauncher.extraJdks = [ ];
 

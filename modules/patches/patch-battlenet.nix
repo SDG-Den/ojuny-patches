@@ -8,9 +8,20 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-battlenet =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.battlenet.enable = lib.mkEnableOption "the Battle.net patch";
+
+      # @option widget = "switch"; label = "Battle.net"; group = "Battle.net"; description = "Install the Battle.net installer, launcher, reset command, and desktop entry. The installer downloads from Blizzard on first run.";
+      config.ojuny.patch.battlenet.enable = false;
+
+      imports = [ self.modules.nixos.battlenet-backend ];
+    };
+
+  flake.modules.nixos.battlenet-backend =
     {
       config,
       lib,
@@ -18,28 +29,34 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.battlenet;
+      cfg = config.ojuny.patch.battlenet // {
+        enable = active;
+      };
+      active = config.ojuny.patch.battlenet.enable && (config.ojuny.patches or true);
 
       proton = pkgs.proton-ge-bin.steamcompattool;
       umu = "${pkgs.umu-launcher}/bin/umu-run";
       launcherRelative = "drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe";
 
       launchCommand =
-        if cfg.mangohud then ''
-          exec "${pkgs.mangohud}/bin/mangohud" --dlsym env \
-            WINEPREFIX="$prefix" \
-            PROTONPATH="${proton}" \
-            GAMEID=umu-battlenet \
-            PROTON_VERB=run \
-            "${umu}" "$launcher" "$@"
-        '' else ''
-          exec env \
-            WINEPREFIX="$prefix" \
-            PROTONPATH="${proton}" \
-            GAMEID=umu-battlenet \
-            PROTON_VERB=run \
-            "${umu}" "$launcher" "$@"
-        '';
+        if cfg.mangohud then
+          ''
+            exec "${pkgs.mangohud}/bin/mangohud" --dlsym env \
+              WINEPREFIX="$prefix" \
+              PROTONPATH="${proton}" \
+              GAMEID=umu-battlenet \
+              PROTON_VERB=run \
+              "${umu}" "$launcher" "$@"
+          ''
+        else
+          ''
+            exec env \
+              WINEPREFIX="$prefix" \
+              PROTONPATH="${proton}" \
+              GAMEID=umu-battlenet \
+              PROTON_VERB=run \
+              "${umu}" "$launcher" "$@"
+          '';
 
       installerBin = pkgs.writeShellApplication {
         name = "battlenet-install";
@@ -161,8 +178,6 @@
     in
     {
       options.ojuny.patch.battlenet = {
-        enable = lib.mkEnableOption "the Battle.net patch";
-
         prefix = lib.mkOption {
           type = lib.types.str;
           default = "$HOME/Games/battlenet";
@@ -178,9 +193,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Battle.net"; group = "Battle.net"; description = "Install the Battle.net installer, launcher, reset command, and desktop entry. The installer downloads from Blizzard on first run.";
-          ojuny.patch.battlenet.enable = false;
-
           # @option widget = "text"; label = "Wine prefix"; group = "Battle.net"; description = "Per-user Battle.net prefix. Keep the default unless another location is required."; visibleWhen.path = "ojuny.patch.battlenet.enable"; visibleWhen.equals = true;
           ojuny.patch.battlenet.prefix = "$HOME/Games/battlenet";
 

@@ -8,16 +8,31 @@
   systems = [ "all" ];
 */
 
-{ ... }: {
+{ self, ... }: {
 
   flake.modules.nixos.patch-moonlight-sunshine =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.moonlight-sunshine.enable =
+        lib.mkEnableOption "the Moonlight and Sunshine patch";
+
+      # @option widget = "switch"; label = "Moonlight and Sunshine"; group = "Game streaming"; groupOrder = 10; order = 10; description = "Install the Moonlight client. Turn on the Sunshine host only on the machine that will stream games.";
+      config.ojuny.patch.moonlight-sunshine.enable = false;
+
+      imports = [ self.modules.nixos.moonlight-sunshine-backend ];
+    };
+
+  flake.modules.nixos.moonlight-sunshine-backend =
     {
       config,
       lib,
       ...
     }:
     let
-      cfg = config.ojuny.patch.moonlight-sunshine;
+      cfg = config.ojuny.patch.moonlight-sunshine // {
+        enable = active;
+      };
+      active = config.ojuny.patch.moonlight-sunshine.enable && (config.ojuny.patches or true);
 
       hostEnabled = cfg.enable && cfg.host;
 
@@ -35,8 +50,6 @@
     in
     {
       options.ojuny.patch.moonlight-sunshine = {
-        enable = lib.mkEnableOption "the Moonlight and Sunshine patch";
-
         client = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -73,9 +86,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Moonlight and Sunshine"; group = "Game streaming"; groupOrder = 10; order = 10; description = "Install the Moonlight client. Turn on the Sunshine host only on the machine that will stream games.";
-          ojuny.patch.moonlight-sunshine.enable = false;
-
           # @option widget = "switch"; label = "Moonlight client"; group = "Moonlight client"; groupOrder = 20; order = 10; visibleWhen.path = "ojuny.patch.moonlight-sunshine.enable"; visibleWhen.equals = true; description = "Install Moonlight Qt through the NixOS programs.moonlight-qt module. The client can connect to this machine or to another Sunshine host.";
           ojuny.patch.moonlight-sunshine.client = true;
 

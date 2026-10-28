@@ -8,10 +8,21 @@
   systems = [ "all" ];
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos.patch-fido2 =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.fido2.enable = lib.mkEnableOption "FIDO2/U2F hardware authentication";
+
+      # @option widget = "switch"; label = "FIDO2 hardware"; group = "FIDO2 hardware"; description = "Enable FIDO2/U2F security-key authentication and install the ojuny-fido2 helper.";
+      config.ojuny.patch.fido2.enable = false;
+
+      imports = [ self.modules.nixos.fido2-backend ];
+    };
+
+  flake.modules.nixos.fido2-backend =
     {
       config,
       lib,
@@ -19,7 +30,10 @@
       ...
     }:
     let
-      cfg = config.ojuny.patch.fido2;
+      active = config.ojuny.patch.fido2.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.fido2 // {
+        enable = active;
+      };
 
       pamModule = "${pkgs.pam_u2f}/lib/security/pam_u2f.so";
       pamPermit = "${pkgs.pam}/lib/security/pam_permit.so";
@@ -29,7 +43,8 @@
         "authfile=${cfg.authFile}"
         "origin=${cfg.origin}"
         "appid=${cfg.appid}"
-      ] ++ lib.optional cfg.cue "cue";
+      ]
+      ++ lib.optional cfg.cue "cue";
 
       pamArgsText = lib.concatStringsSep " " pamArgs;
 
@@ -250,8 +265,6 @@
     in
     {
       options.ojuny.patch.fido2 = {
-        enable = lib.mkEnableOption "FIDO2/U2F hardware authentication";
-
         authFile = lib.mkOption {
           type = lib.types.str;
           default = "/etc/fido2/fido2";
@@ -271,7 +284,10 @@
         };
 
         control = lib.mkOption {
-          type = lib.types.enum [ "sufficient" "required" ];
+          type = lib.types.enum [
+            "sufficient"
+            "required"
+          ];
           default = "sufficient";
           description = "PAM control for login, greetd, sudo and polkit-1. sufficient keeps password fallback.";
         };
@@ -313,9 +329,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "FIDO2 hardware"; group = "FIDO2 hardware"; description = "Enable FIDO2/U2F security-key authentication and install the ojuny-fido2 helper.";
-          ojuny.patch.fido2.enable = false;
-
           # @option widget = "text"; label = "Auth file"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Runtime key mapping file. Keep the default unless another absolute path is required. This path is never a Nix store path.";
           ojuny.patch.fido2.authFile = "/etc/fido2/fido2";
 

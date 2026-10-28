@@ -22,22 +22,19 @@
   placeholders.packages.default = "";
 */
 
-{  self, inputs, ... }:
+{ self, ... }:
 
 {
 
-   flake.modules.nixos.patch-nixshell = { config, lib, ... }: {
-    options.ojuny.patch.nixshell.enable = lib.mkEnableOption "the nix shell preset patch";
-    # @option widget = "switch"; label = "Nix Shell patch"; group = "Patches"; description = "Enable the Nix Shell patch.";
-    config.ojuny.patch.nixshell.enable = false;
+  flake.modules.nixos.patch-nixshell =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.nixshell.enable = lib.mkEnableOption "the nix shell preset patch";
+      # @option widget = "switch"; label = "Nix Shell patch"; group = "Patches"; description = "Enable the Nix Shell patch.";
+      config.ojuny.patch.nixshell.enable = false;
 
-    imports = [
-      ((import ./_gate.nix { inherit lib; })
-        (args: args.config.ojuny.patches && args.config.ojuny.patch.nixshell.enable)
-        self.modules.nixos.nixshell-backend)
-    ];
-
-  };
+      imports = [ self.modules.nixos.nixshell-backend ];
+    };
 
   flake.modules.nixos.nixshell-backend =
     {
@@ -46,6 +43,9 @@
       pkgs,
       ...
     }:
+    let
+      active = config.ojuny.patch.nixshell.enable && (config.ojuny.patches or true);
+    in
     {
 
       options.ojuny.apps.nixshell = {
@@ -69,7 +69,7 @@
         };
       };
 
-      config = {
+      config = lib.mkIf active {
 
         # @option widget = "switch"; label = "Nix shell aliases"; group = "Aliases"; description = "Export the aliases below to the shell environment.";
         ojuny.apps.nixshell.enable = true;
@@ -166,7 +166,9 @@
         ];
 
         # Derived, no @option: every non-empty alias becomes "nix shell nixpkgs#<name> ...".
-        environment.shellAliases = lib.mapAttrs ( _: entry: "nix shell ${lib.concatMapStringsSep " " (name: "nixpkgs#${name}") entry.packages}" ) (lib.filterAttrs (_: entry: entry.packages != [ ]) config.ojuny.apps.nixshell.aliases); 
+        environment.shellAliases = lib.mapAttrs (
+          _: entry: "nix shell ${lib.concatMapStringsSep " " (name: "nixpkgs#${name}") entry.packages}"
+        ) (lib.filterAttrs (_: entry: entry.packages != [ ]) config.ojuny.apps.nixshell.aliases);
 
         /*
           @insert

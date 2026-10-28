@@ -26,13 +26,36 @@
   placeholders.name.default = "example";
 */
 
-{ ... }:
+{ self, ... }:
 
 {
   flake.modules.nixos."patch-secrets" =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      ...
+    }:
+    {
+      options.ojuny.patch.secrets.enable = lib.mkEnableOption "the age secrets patch";
+
+      # @option widget = "switch"; label = "Secrets"; group = "Secrets"; description = "Enable age-encrypted secrets.";
+      config.ojuny.patch.secrets.enable = false;
+
+      imports = [ self.modules.nixos.secrets-backend ];
+    };
+
+  flake.modules.nixos.secrets-backend =
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
-      cfg = config.ojuny.patch.secrets;
+      active = config.ojuny.patch.secrets.enable && (config.ojuny.patches or true);
+      cfg = config.ojuny.patch.secrets // {
+        enable = active;
+      };
 
       staging = "/run/ojuny-secrets-staging";
 
@@ -86,8 +109,6 @@
     in
     {
       options.ojuny.patch.secrets = {
-        enable = lib.mkEnableOption "the age secrets patch";
-
         keyFile = lib.mkOption {
           type = lib.types.str;
           default = "/var/lib/ojuny-age/keys.txt";
@@ -133,9 +154,6 @@
 
       config = lib.mkMerge [
         {
-          # @option widget = "switch"; label = "Secrets"; group = "Secrets"; description = "Enable age-encrypted secrets.";
-          ojuny.patch.secrets.enable = false;
-
           # @option widget = "path"; label = "Key file"; group = "Advanced"; hidden = true; description = "Age identity file outside the flake and the Nix store.";
           ojuny.patch.secrets.keyFile = "/var/lib/ojuny-age/keys.txt";
 
