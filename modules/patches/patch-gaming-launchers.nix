@@ -11,15 +11,35 @@
 { self, ... }: {
 
   flake.modules.nixos.patch-gaming-launchers =
-    { config, lib, ... }:
+    { config, lib, pkgs, ... }:
     {
       options.ojuny.patch.gaming-launchers.enable =
         lib.mkEnableOption "the Lutris and Heroic gaming launchers patch";
 
-      # @option widget = "switch"; label = "Gaming launchers"; group = "Gaming launchers"; description = "Install Lutris and Heroic with Wine and Proton.";
-      config.ojuny.patch.gaming-launchers.enable = false;
-
       imports = [ self.modules.nixos.gaming-launchers-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Gaming launchers"; group = "Gaming launchers"; description = "Install Lutris and Heroic with Wine and Proton.";
+        ojuny.patch.gaming-launchers.enable = false;
+
+        # @option widget = "switch"; label = "Lutris"; group = "Launchers"; description = "Install Lutris. It fetches DXVK and VKD3D on first launch."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
+        ojuny.patch.gaming-launchers.lutris.enable = true;
+
+        # @option widget = "switch"; label = "Heroic"; group = "Launchers"; description = "Install Heroic for Epic, GOG and Amazon games. It fetches its Wine and Proton runtimes on demand."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
+        ojuny.patch.gaming-launchers.heroic.enable = true;
+
+        # @option widget = "package"; label = "Wine package"; group = "Wine and Proton"; description = "System Wine build. wineWow64Packages.stable is the default; staging or stableFull are alternatives."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
+        ojuny.patch.gaming-launchers.wine.package = pkgs.wineWow64Packages.stable;
+
+        # @option widget = "switch"; label = "Winetricks"; group = "Wine and Proton"; description = "Install winetricks to add Windows runtime components to a Wine prefix."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
+        ojuny.patch.gaming-launchers.wine.winetricks = true;
+
+        # @option widget = "switch"; label = "Protontricks"; group = "Wine and Proton"; description = "Install protontricks for Steam Proton prefixes. Requires Steam and its runtime."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
+        ojuny.patch.gaming-launchers.wine.protontricks = false;
+
+        # @option widget = "switch"; label = "Proton GE for Steam"; group = "Wine and Proton"; description = "Add Proton GE to Steam Play when Steam is enabled. It is not added to system packages."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
+        ojuny.patch.gaming-launchers.protonGE = true;
+      };
     };
 
   flake.modules.nixos.gaming-launchers-backend =
@@ -91,27 +111,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "Lutris"; group = "Launchers"; description = "Install Lutris. It fetches DXVK and VKD3D on first launch."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
-          ojuny.patch.gaming-launchers.lutris.enable = true;
-
-          # @option widget = "switch"; label = "Heroic"; group = "Launchers"; description = "Install Heroic for Epic, GOG and Amazon games. It fetches its Wine and Proton runtimes on demand."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
-          ojuny.patch.gaming-launchers.heroic.enable = true;
-
-          # @option widget = "package"; label = "Wine package"; group = "Wine and Proton"; description = "System Wine build. wineWow64Packages.stable is the default; staging or stableFull are alternatives."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
-          ojuny.patch.gaming-launchers.wine.package = pkgs.wineWow64Packages.stable;
-
-          # @option widget = "switch"; label = "Winetricks"; group = "Wine and Proton"; description = "Install winetricks to add Windows runtime components to a Wine prefix."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
-          ojuny.patch.gaming-launchers.wine.winetricks = true;
-
-          # @option widget = "switch"; label = "Protontricks"; group = "Wine and Proton"; description = "Install protontricks for Steam Proton prefixes. Requires Steam and its runtime."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
-          ojuny.patch.gaming-launchers.wine.protontricks = false;
-
-          # @option widget = "switch"; label = "Proton GE for Steam"; group = "Wine and Proton"; description = "Add Proton GE to Steam Play when Steam is enabled. It is not added to system packages."; visibleWhen.path = "ojuny.patch.gaming-launchers.enable"; visibleWhen.equals = true;
-          ojuny.patch.gaming-launchers.protonGE = true;
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           environment.systemPackages = lib.optionals launcherEnabled (launcherPackages ++ sharedPackages);
 
           hardware.graphics.enable = lib.mkIf launcherEnabled true;
@@ -119,7 +119,6 @@
           programs.steam.extraCompatPackages = lib.mkIf (cfg.protonGE && config.programs.steam.enable) [
             pkgs.proton-ge-bin
           ];
-        })
-      ];
+      };
     };
 }

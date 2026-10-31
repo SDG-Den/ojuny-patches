@@ -16,10 +16,42 @@
     {
       options.ojuny.patch.fido2.enable = lib.mkEnableOption "FIDO2/U2F hardware authentication";
 
-      # @option widget = "switch"; label = "FIDO2 hardware"; group = "FIDO2 hardware"; description = "Enable FIDO2/U2F security-key authentication and install the ojuny-fido2 helper.";
-      config.ojuny.patch.fido2.enable = false;
-
       imports = [ self.modules.nixos.fido2-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "FIDO2 hardware"; group = "FIDO2 hardware"; description = "Enable FIDO2/U2F security-key authentication and install the ojuny-fido2 helper.";
+        ojuny.patch.fido2.enable = false;
+
+        # @option widget = "text"; label = "Auth file"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Runtime key mapping file. Keep the default unless another absolute path is required. This path is never a Nix store path.";
+        ojuny.patch.fido2.authFile = "/etc/fido2/fido2";
+
+        # @option widget = "text"; label = "Origin"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "pam_u2f origin and pamu2fcfg relying-party ID. Enrollment and PAM must use the same value.";
+        ojuny.patch.fido2.origin = "pam://ojuny";
+
+        # @option widget = "text"; label = "App ID"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "pam_u2f app ID and pamu2fcfg relying-party name. Enrollment and PAM must use the same value.";
+        ojuny.patch.fido2.appid = "pam://ojuny";
+
+        # @option widget = "dropdown"; label = "PAM control"; group = "PAM services"; advanced = true; choices = [ "sufficient" "required" ]; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "sufficient keeps the password fallback. required makes the key mandatory for login, greetd, sudo and polkit and can lock you out.";
+        ojuny.patch.fido2.control = "sufficient";
+
+        # @option widget = "switch"; label = "Touch prompt"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Add the pam_u2f cue argument so the user is told to touch the key.";
+        ojuny.patch.fido2.cue = true;
+
+        # @option widget = "switch"; label = "Console login"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key as an alternative to the password for the login PAM service.";
+        ojuny.patch.fido2.services.login = true;
+
+        # @option widget = "switch"; label = "Greeter"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key for the greetd PAM service used by the graphical login.";
+        ojuny.patch.fido2.services.greetd = true;
+
+        # @option widget = "switch"; label = "sudo"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key for sudo. With sufficient control this replaces the password, so keep it off unless that policy is intended.";
+        ojuny.patch.fido2.services.sudo = false;
+
+        # @option widget = "switch"; label = "polkit"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key for polkit-1. With sufficient control this replaces the password, so keep it off unless that policy is intended.";
+        ojuny.patch.fido2.services.polkit = false;
+
+        # @option widget = "switch"; label = "Lock screen"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Create /etc/pam.d/dankshell-u2f for the DMS lock screen. Also enable the Lock screen Security key switch.";
+        ojuny.patch.fido2.services.lock = true;
+      };
     };
 
   flake.modules.nixos.fido2-backend =
@@ -327,39 +359,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "text"; label = "Auth file"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Runtime key mapping file. Keep the default unless another absolute path is required. This path is never a Nix store path.";
-          ojuny.patch.fido2.authFile = "/etc/fido2/fido2";
-
-          # @option widget = "text"; label = "Origin"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "pam_u2f origin and pamu2fcfg relying-party ID. Enrollment and PAM must use the same value.";
-          ojuny.patch.fido2.origin = "pam://ojuny";
-
-          # @option widget = "text"; label = "App ID"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "pam_u2f app ID and pamu2fcfg relying-party name. Enrollment and PAM must use the same value.";
-          ojuny.patch.fido2.appid = "pam://ojuny";
-
-          # @option widget = "dropdown"; label = "PAM control"; group = "PAM services"; advanced = true; choices = [ "sufficient" "required" ]; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "sufficient keeps the password fallback. required makes the key mandatory for login, greetd, sudo and polkit and can lock you out.";
-          ojuny.patch.fido2.control = "sufficient";
-
-          # @option widget = "switch"; label = "Touch prompt"; group = "Advanced"; advanced = true; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Add the pam_u2f cue argument so the user is told to touch the key.";
-          ojuny.patch.fido2.cue = true;
-
-          # @option widget = "switch"; label = "Console login"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key as an alternative to the password for the login PAM service.";
-          ojuny.patch.fido2.services.login = true;
-
-          # @option widget = "switch"; label = "Greeter"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key for the greetd PAM service used by the graphical login.";
-          ojuny.patch.fido2.services.greetd = true;
-
-          # @option widget = "switch"; label = "sudo"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key for sudo. With sufficient control this replaces the password, so keep it off unless that policy is intended.";
-          ojuny.patch.fido2.services.sudo = false;
-
-          # @option widget = "switch"; label = "polkit"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Allow the security key for polkit-1. With sufficient control this replaces the password, so keep it off unless that policy is intended.";
-          ojuny.patch.fido2.services.polkit = false;
-
-          # @option widget = "switch"; label = "Lock screen"; group = "PAM services"; visibleWhen.path = "ojuny.patch.fido2.enable"; visibleWhen.equals = true; description = "Create /etc/pam.d/dankshell-u2f for the DMS lock screen. Also enable the Lock screen Security key switch.";
-          ojuny.patch.fido2.services.lock = true;
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion = lib.hasPrefix "/" cfg.authFile;
@@ -427,7 +427,6 @@
 
           desktop.ojuny.dux.settings.enableU2f = lib.mkIf cfg.services.lock (lib.mkForce true);
           desktop.ojuny.dux.settings.u2fMode = lib.mkIf cfg.services.lock (lib.mkForce u2fMode);
-        })
-      ];
+      };
     };
 }

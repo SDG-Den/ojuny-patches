@@ -13,14 +13,83 @@
 {
   flake.modules.nixos.patch-advanced-hardware-tools =
     { config, lib, ... }:
+    let
+      facter = config.hardware.facter.report;
+      facterCpus = facter.hardware.cpu or [ ];
+      facterCpu = if facterCpus == [ ] then { } else lib.head facterCpus;
+      facterSystem = facter.smbios.system or { };
+      cpuVendor = facterCpu.vendor_name or "";
+      product = facterSystem.product or "";
+
+      isIntel = cpuVendor == "GenuineIntel";
+      fanDetected = facter == { } || isIntel;
+
+      hapticsDevice =
+        if config.ojuny.patch.advanced-hardware-tools.haptics.device != "auto" then
+          config.ojuny.patch.advanced-hardware-tools.haptics.device
+        else if lib.hasInfix "xps" (lib.toLower product) then
+          "dell-xps"
+        else if lib.hasInfix "h7407ba" (lib.toLower product) then
+          "asus-proart-p14"
+        else
+          "none";
+
+      hapticsReady =
+        hapticsDevice == "asus-proart-p14"
+        || (hapticsDevice == "dell-xps" && config.ojuny.patch.advanced-hardware-tools.haptics.package != null);
+    in
     {
       options.ojuny.patch.advanced-hardware-tools.enable =
         lib.mkEnableOption "the advanced hardware tools patch";
 
-      # @option widget = "switch"; label = "Advanced hardware tools"; group = "Advanced hardware"; description = "Enable CPU scaling, touchpad haptics and thermal control independently.";
-      config.ojuny.patch.advanced-hardware-tools.enable = false;
-
       imports = [ self.modules.nixos.advanced-hardware-tools-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Advanced hardware tools"; group = "Advanced hardware"; description = "Enable CPU scaling, touchpad haptics and thermal control independently.";
+        ojuny.patch.advanced-hardware-tools.enable = false;
+
+        # @option widget = "switch"; label = "CPU scaling"; group = "CPU"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "Set the CPU frequency governor and, optionally, the energy performance preference.";
+        ojuny.patch.advanced-hardware-tools.cpu.enable = false;
+
+        # @option widget = "dropdown"; label = "Governor"; group = "CPU"; choices = [ "kernel" "schedutil" "powersave" "performance" "ondemand" "conservative" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.cpu.enable"; visibleWhen.equals = true; description = "kernel leaves the kernel default untouched. schedutil is the normal modern default.";
+        ojuny.patch.advanced-hardware-tools.cpu.governor = "schedutil";
+
+        # @option widget = "dropdown"; label = "Energy performance preference"; group = "CPU"; choices = [ "default" "performance" "balance_performance" "balance_power" "power" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.cpu.enable"; visibleWhen.equals = true; description = "default disables the EPP writer. Other values are written to every writable cpufreq policy.";
+        ojuny.patch.advanced-hardware-tools.cpu.epp = "default";
+
+        # @option widget = "dropdown"; label = "Touchpad"; group = "Haptics"; choices = [ "auto" "dell-xps" "asus-proart-p14" "none" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "auto uses the facter DMI report. Select a model explicitly when no report is available.";
+        ojuny.patch.advanced-hardware-tools.haptics.device = "auto";
+
+        # @option widget = "package"; label = "Dell haptics package"; group = "Haptics"; nullable = true; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.haptics.detected"; visibleWhen.equals = "dell-xps"; description = "Optional package providing bin/dell-xps-touchpad-haptics-daemon. The vendor daemon is not vendored by this patch.";
+        ojuny.patch.advanced-hardware-tools.haptics.package = null;
+
+        # @option widget = "dropdown"; label = "Click strength"; group = "Haptics"; choices = [ "low" "mid" "high" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.haptics.detected"; visibleWhen.equals = "dell-xps"; description = "Written as INTENSITY=10, 50 or 100 for the Dell daemon.";
+        ojuny.patch.advanced-hardware-tools.haptics.strength = "mid";
+
+        # @option widget = "dropdown"; label = "Detected touchpad"; group = "Haptics"; choices = [ "none" "dell-xps" "asus-proart-p14" ]; readonly = true; advanced = true; description = "Computed from facter smbios.system.product or the explicit Touchpad selection.";
+        ojuny.patch.advanced-hardware-tools.haptics.detected = hapticsDevice;
+
+        # @option widget = "switch"; label = "Ready to enable"; group = "Haptics"; readonly = true; advanced = true; description = "True when the selected device has a self-contained quirk or a Dell package is set.";
+        ojuny.patch.advanced-hardware-tools.haptics.ready = hapticsReady;
+
+        # @option widget = "switch"; label = "Enable haptics"; group = "Haptics"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.haptics.ready"; visibleWhen.equals = true; description = "Apply the selected touchpad path. Unsupported devices never show this switch.";
+        ojuny.patch.advanced-hardware-tools.haptics.enable = false;
+
+        # @option widget = "switch"; label = "Fan and thermal control"; group = "Fan"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "Enable thermald on supported Intel laptops, or an explicit fancontrol configuration.";
+        ojuny.patch.advanced-hardware-tools.fan.enable = false;
+
+        # @option widget = "dropdown"; label = "Mode"; group = "Fan"; choices = [ "thermald" "fancontrol" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.fan.enable"; visibleWhen.equals = true; description = "thermald is the safe thermal daemon. fancontrol applies a user-supplied fan curve.";
+        ojuny.patch.advanced-hardware-tools.fan.mode = "thermald";
+
+        # @option widget = "switch"; label = "Ignore CPUID check"; group = "Fan"; advanced = true; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.fan.mode"; visibleWhen.equals = "thermald"; description = "Pass through to services.thermald.ignoreCpuidCheck. Only use on hardware known to work.";
+        ojuny.patch.advanced-hardware-tools.fan.ignoreCpuidCheck = false;
+
+        # @option widget = "raw"; label = "fancontrol configuration"; group = "Fan"; rows = 12; advanced = true; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.fan.mode"; visibleWhen.equals = "fancontrol"; description = "Required pwmconfig style configuration. Wrong values can overheat or damage hardware.";
+        ojuny.patch.advanced-hardware-tools.fan.fancontrolConfig = "";
+
+        # @option widget = "switch"; label = "Thermal control detected"; group = "Fan"; readonly = true; advanced = true; description = "True when facter identifies Intel, or when no facter report is available and the runtime ExecCondition decides.";
+        ojuny.patch.advanced-hardware-tools.fan.detected = fanDetected;
+      };
     };
 
   flake.modules.nixos.advanced-hardware-tools-backend =
@@ -205,49 +274,6 @@
       };
 
       config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "CPU scaling"; group = "CPU"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "Set the CPU frequency governor and, optionally, the energy performance preference.";
-          ojuny.patch.advanced-hardware-tools.cpu.enable = false;
-
-          # @option widget = "dropdown"; label = "Governor"; group = "CPU"; choices = [ "kernel" "schedutil" "powersave" "performance" "ondemand" "conservative" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.cpu.enable"; visibleWhen.equals = true; description = "kernel leaves the kernel default untouched. schedutil is the normal modern default.";
-          ojuny.patch.advanced-hardware-tools.cpu.governor = "schedutil";
-
-          # @option widget = "dropdown"; label = "Energy performance preference"; group = "CPU"; choices = [ "default" "performance" "balance_performance" "balance_power" "power" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.cpu.enable"; visibleWhen.equals = true; description = "default disables the EPP writer. Other values are written to every writable cpufreq policy.";
-          ojuny.patch.advanced-hardware-tools.cpu.epp = "default";
-
-          # @option widget = "dropdown"; label = "Touchpad"; group = "Haptics"; choices = [ "auto" "dell-xps" "asus-proart-p14" "none" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "auto uses the facter DMI report. Select a model explicitly when no report is available.";
-          ojuny.patch.advanced-hardware-tools.haptics.device = "auto";
-
-          # @option widget = "package"; label = "Dell haptics package"; group = "Haptics"; nullable = true; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.haptics.detected"; visibleWhen.equals = "dell-xps"; description = "Optional package providing bin/dell-xps-touchpad-haptics-daemon. The vendor daemon is not vendored by this patch.";
-          ojuny.patch.advanced-hardware-tools.haptics.package = null;
-
-          # @option widget = "dropdown"; label = "Click strength"; group = "Haptics"; choices = [ "low" "mid" "high" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.haptics.detected"; visibleWhen.equals = "dell-xps"; description = "Written as INTENSITY=10, 50 or 100 for the Dell daemon.";
-          ojuny.patch.advanced-hardware-tools.haptics.strength = "mid";
-
-          # @option widget = "dropdown"; label = "Detected touchpad"; group = "Haptics"; choices = [ "none" "dell-xps" "asus-proart-p14" ]; readonly = true; advanced = true; description = "Computed from facter smbios.system.product or the explicit Touchpad selection.";
-          ojuny.patch.advanced-hardware-tools.haptics.detected = hapticsDevice;
-
-          # @option widget = "switch"; label = "Ready to enable"; group = "Haptics"; readonly = true; advanced = true; description = "True when the selected device has a self-contained quirk or a Dell package is set.";
-          ojuny.patch.advanced-hardware-tools.haptics.ready = hapticsReady;
-
-          # @option widget = "switch"; label = "Enable haptics"; group = "Haptics"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.haptics.ready"; visibleWhen.equals = true; description = "Apply the selected touchpad path. Unsupported devices never show this switch.";
-          ojuny.patch.advanced-hardware-tools.haptics.enable = false;
-
-          # @option widget = "switch"; label = "Fan and thermal control"; group = "Fan"; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.enable"; visibleWhen.equals = true; description = "Enable thermald on supported Intel laptops, or an explicit fancontrol configuration.";
-          ojuny.patch.advanced-hardware-tools.fan.enable = false;
-
-          # @option widget = "dropdown"; label = "Mode"; group = "Fan"; choices = [ "thermald" "fancontrol" ]; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.fan.enable"; visibleWhen.equals = true; description = "thermald is the safe thermal daemon. fancontrol applies a user-supplied fan curve.";
-          ojuny.patch.advanced-hardware-tools.fan.mode = "thermald";
-
-          # @option widget = "switch"; label = "Ignore CPUID check"; group = "Fan"; advanced = true; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.fan.mode"; visibleWhen.equals = "thermald"; description = "Pass through to services.thermald.ignoreCpuidCheck. Only use on hardware known to work.";
-          ojuny.patch.advanced-hardware-tools.fan.ignoreCpuidCheck = false;
-
-          # @option widget = "raw"; label = "fancontrol configuration"; group = "Fan"; rows = 12; advanced = true; visibleWhen.path = "ojuny.patch.advanced-hardware-tools.fan.mode"; visibleWhen.equals = "fancontrol"; description = "Required pwmconfig style configuration. Wrong values can overheat or damage hardware.";
-          ojuny.patch.advanced-hardware-tools.fan.fancontrolConfig = "";
-
-          # @option widget = "switch"; label = "Thermal control detected"; group = "Fan"; readonly = true; advanced = true; description = "True when facter identifies Intel, or when no facter report is available and the runtime ExecCondition decides.";
-          ojuny.patch.advanced-hardware-tools.fan.detected = fanDetected;
-        }
         {
           assertions = [
             {

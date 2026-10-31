@@ -20,14 +20,31 @@
     {
       options.ojuny.patch.cloud-storage.enable = lib.mkEnableOption "the cloud storage patch";
 
-      # @option widget = "switch"; label = "Cloud storage"; group = "Cloud storage"; description = "Enable the cloud storage patch."
-      config.ojuny.patch.cloud-storage.enable = false;
-
       imports = [ self.modules.nixos.cloud-storage-backend ];
 
-      config.home-manager.sharedModules = lib.mkIf (
-        config.ojuny.patch.cloud-storage.enable && (config.ojuny.patches or true)
-      ) [ self.modules.homeManager.cloud-storage-backend ];
+      config = {
+        # @option widget = "switch"; label = "Cloud storage"; group = "Cloud storage"; description = "Enable the cloud storage patch."
+        ojuny.patch.cloud-storage.enable = false;
+
+        # @option widget = "dropdown"; label = "Provider"; group = "Cloud storage"; choices = [ "nextcloud" "owncloud" "opencloud" "seafile" ]; description = "FOSS cloud provider and desktop client."; visibleWhen.path = "ojuny.patch.cloud-storage.enable"; visibleWhen.equals = true;
+        ojuny.patch.cloud-storage.provider = "nextcloud";
+
+        # @option widget = "switch"; label = "GNOME Keyring"; group = "System integration"; description = "Store client credentials in GNOME Keyring through the Secret Service API."; visibleWhen.path = "ojuny.patch.cloud-storage.enable"; visibleWhen.equals = true;
+        ojuny.patch.cloud-storage.keyring = true;
+
+        # @option widget = "switch"; label = "Start in background"; group = "Nextcloud"; description = "Start the Nextcloud client without opening the main window."; visibleWhen.path = "ojuny.patch.cloud-storage.provider"; visibleWhen.equals = "nextcloud";
+        ojuny.patch.cloud-storage.nextcloud.startInBackground = true;
+
+        # @option widget = "text"; label = "Server URL"; group = "Nextcloud"; description = "Optional URL to prefill the next account setup. Passed as --overrideserverurl. Never a password."; visibleWhen.path = "ojuny.patch.cloud-storage.provider"; visibleWhen.equals = "nextcloud";
+        ojuny.patch.cloud-storage.nextcloud.serverUrl = "";
+
+        # @option widget = "text"; label = "Local folder"; group = "Nextcloud"; description = "Optional local folder to prefill the next account setup. Passed as --overridelocaldir. Use an absolute path."; visibleWhen.path = "ojuny.patch.cloud-storage.provider"; visibleWhen.equals = "nextcloud";
+        ojuny.patch.cloud-storage.nextcloud.localFolder = "";
+
+        home-manager.sharedModules = lib.mkIf (
+          config.ojuny.patch.cloud-storage.enable && (config.ojuny.patches or true)
+        ) [ self.modules.homeManager.cloud-storage-backend ];
+      };
     };
 
   flake.modules.nixos.cloud-storage-backend =
@@ -118,25 +135,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "dropdown"; label = "Provider"; group = "Cloud storage"; choices = [ "nextcloud" "owncloud" "opencloud" "seafile" ]; description = "FOSS cloud provider and desktop client."; visibleWhen.path = "ojuny.patch.cloud-storage.enable"; visibleWhen.equals = true;
-          ojuny.patch.cloud-storage.provider = "nextcloud";
-
-          # @option widget = "switch"; label = "GNOME Keyring"; group = "System integration"; description = "Store client credentials in GNOME Keyring through the Secret Service API."; visibleWhen.path = "ojuny.patch.cloud-storage.enable"; visibleWhen.equals = true;
-          ojuny.patch.cloud-storage.keyring = true;
-
-          # @option widget = "switch"; label = "Start in background"; group = "Nextcloud"; description = "Start the Nextcloud client without opening the main window."; visibleWhen.path = "ojuny.patch.cloud-storage.provider"; visibleWhen.equals = "nextcloud";
-          ojuny.patch.cloud-storage.nextcloud.startInBackground = true;
-
-          # @option widget = "text"; label = "Server URL"; group = "Nextcloud"; description = "Optional URL to prefill the next account setup. Passed as --overrideserverurl. Never a password."; visibleWhen.path = "ojuny.patch.cloud-storage.provider"; visibleWhen.equals = "nextcloud";
-          ojuny.patch.cloud-storage.nextcloud.serverUrl = "";
-
-          # @option widget = "text"; label = "Local folder"; group = "Nextcloud"; description = "Optional local folder to prefill the next account setup. Passed as --overridelocaldir. Use an absolute path."; visibleWhen.path = "ojuny.patch.cloud-storage.provider"; visibleWhen.equals = "nextcloud";
-          ojuny.patch.cloud-storage.nextcloud.localFolder = "";
-        }
-
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion =
@@ -155,8 +154,7 @@
           services.gnome.gnome-keyring.enable = lib.mkIf cfg.keyring true;
           security.pam.services.login.enableGnomeKeyring = lib.mkIf cfg.keyring true;
           security.pam.services.greetd.enableGnomeKeyring = lib.mkIf (cfg.keyring && greetdEnabled) true;
-        })
-      ];
+      };
     };
 
   flake.modules.homeManager.cloud-storage-backend =

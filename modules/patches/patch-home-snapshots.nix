@@ -15,10 +15,42 @@
     {
       options.ojuny.patch.home-snapshots.enable = lib.mkEnableOption "scheduled home snapshots";
 
-      # @option widget = "switch"; label = "Home snapshots"; group = "Home snapshots";
-      config.ojuny.patch.home-snapshots.enable = false;
-
       imports = [ self.modules.nixos.home-snapshots-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Home snapshots"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.enable = false;
+
+        # @option widget = "text"; label = "Repository"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.repository = "/var/lib/ojuny/home-restic";
+
+        # @option widget = "text"; label = "Password file"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.passwordFile = "/var/lib/ojuny/home-restic-password";
+
+        # @option widget = "list"; label = "Paths"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.paths = [ "/home" ];
+
+        # @option widget = "list"; label = "Excludes"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.exclude = [
+          "**/.cache"
+          "**/.local/share/Trash"
+          "**/node_modules"
+          "**/.gradle"
+          "**/.npm"
+        ];
+
+        # @option widget = "dropdown"; label = "Schedule"; group = "Home snapshots"; choices = [ "hourly" "daily" "weekly" ];
+        ojuny.patch.home-snapshots.schedule = "daily";
+
+        # @option widget = "spin"; label = "Keep daily"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.keepDaily = 7;
+
+        # @option widget = "spin"; label = "Keep weekly"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.keepWeekly = 4;
+
+        # @option widget = "spin"; label = "Keep monthly"; group = "Home snapshots";
+        ojuny.patch.home-snapshots.keepMonthly = 6;
+      };
     };
 
   flake.modules.nixos.home-snapshots-backend =
@@ -81,39 +113,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "text"; label = "Repository"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.repository = "/var/lib/ojuny/home-restic";
-
-          # @option widget = "text"; label = "Password file"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.passwordFile = "/var/lib/ojuny/home-restic-password";
-
-          # @option widget = "list"; label = "Paths"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.paths = [ "/home" ];
-
-          # @option widget = "list"; label = "Excludes"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.exclude = [
-            "**/.cache"
-            "**/.local/share/Trash"
-            "**/node_modules"
-            "**/.gradle"
-            "**/.npm"
-          ];
-
-          # @option widget = "dropdown"; label = "Schedule"; group = "Home snapshots"; choices = [ "hourly" "daily" "weekly" ];
-          ojuny.patch.home-snapshots.schedule = "daily";
-
-          # @option widget = "spin"; label = "Keep daily"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.keepDaily = 7;
-
-          # @option widget = "spin"; label = "Keep weekly"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.keepWeekly = 4;
-
-          # @option widget = "spin"; label = "Keep monthly"; group = "Home snapshots";
-          ojuny.patch.home-snapshots.keepMonthly = 6;
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion = cfg.repository != "";
@@ -170,7 +170,6 @@
               Persistent = true;
             };
           };
-        })
-      ];
+      };
     };
 }

@@ -13,14 +13,73 @@
 {
 
   flake.modules.nixos.patch-dictation =
-    { config, lib, ... }:
+    { config, lib, pkgs, ... }:
     {
       options.ojuny.patch.dictation.enable = lib.mkEnableOption "the dictation patch";
 
-      # @option widget = "switch"; label = "Dictation"; group = "Patch"; groupOrder = 10; order = 10; description = "Enable speech-to-text, the hotkey, and the microphone indicator.";
-      config.ojuny.patch.dictation.enable = false;
-
       imports = [ self.modules.nixos.dictation-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Dictation"; group = "Patch"; groupOrder = 10; order = 10; description = "Enable speech-to-text, the hotkey, and the microphone indicator.";
+        ojuny.patch.dictation.enable = false;
+
+        # @option widget = "dropdown"; label = "Backend"; group = "Backend"; groupOrder = 20; order = 10; choices = [ "voxtype" "superwhisper" ]; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Voxtype is local and installed by this patch. Superwhisper is external and needs a package.";
+        ojuny.patch.dictation.backend = "voxtype";
+
+        # @option widget = "package"; label = "Voxtype package"; group = "Voxtype"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "The nixpkgs Voxtype build. Use pkgs.voxtype-vulkan for the Vulkan variant.";
+        ojuny.patch.dictation.voxtype.package = pkgs.voxtype;
+
+        # @option widget = "text"; label = "Audio device"; group = "Voxtype"; groupOrder = 30; order = 20; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "PipeWire or PulseAudio source name. Use default for the system default microphone.";
+        ojuny.patch.dictation.voxtype.device = "default";
+
+        # @option widget = "dropdown"; label = "Model"; group = "Voxtype"; groupOrder = 30; order = 30; choices = [ "tiny.en" "base.en" "small.en" "medium" "large-v3-turbo" ]; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Whisper model name. Larger models are slower and use more memory.";
+        ojuny.patch.dictation.voxtype.model = "base.en";
+
+        # @option widget = "text"; label = "Model file"; group = "Voxtype"; groupOrder = 30; order = 40; advanced = true; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Absolute path to an existing model. When set, the download step is skipped.";
+        ojuny.patch.dictation.voxtype.modelFile = null;
+
+        # @option widget = "switch"; label = "Download model at service start"; group = "Voxtype"; groupOrder = 30; order = 50; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Run voxtype setup --download before the daemon starts. It is a no-op when the model already exists.";
+        ojuny.patch.dictation.voxtype.downloadModel = true;
+
+        # @option widget = "text"; label = "Language"; group = "Voxtype"; groupOrder = 30; order = 60; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Whisper language code, or auto for detection.";
+        ojuny.patch.dictation.voxtype.language = "en";
+
+        # @option widget = "dropdown"; label = "Output mode"; group = "Voxtype"; groupOrder = 30; order = 70; choices = [ "type" "clipboard" "paste" ]; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Type at the cursor, copy to the clipboard, or paste through the clipboard.";
+        ojuny.patch.dictation.voxtype.outputMode = "type";
+
+        # @option widget = "spin"; label = "Maximum recording seconds"; group = "Voxtype"; groupOrder = 30; order = 80; min = 5; max = 600; unit = "s"; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Safety limit on one recording.";
+        ojuny.patch.dictation.voxtype.maxDurationSecs = 60;
+
+        # @option widget = "switch"; label = "Pause media while recording"; group = "Voxtype"; groupOrder = 30; order = 90; advanced = true; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Pause MPRIS players during recording.";
+        ojuny.patch.dictation.voxtype.pauseMedia = true;
+
+        # @option widget = "package"; label = "Superwhisper package"; group = "Superwhisper"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "superwhisper"; description = "External package that provides the superwhisper command. The patch does not vendor or fetch it.";
+        ojuny.patch.dictation.superwhisper.package = null;
+
+        # @option widget = "switch"; label = "Hotkey"; group = "Hotkey"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Add the Mango key binding.";
+        ojuny.patch.dictation.hotkey.enable = true;
+
+        # @option widget = "list"; label = "Hotkey modifiers"; group = "Hotkey"; groupOrder = 50; order = 20; visibleWhen.path = "ojuny.patch.dictation.hotkey.enable"; visibleWhen.equals = true; description = "Mango modifier names.";
+        ojuny.patch.dictation.hotkey.modifier = [
+          "SUPER"
+          "CTRL"
+        ];
+
+        # @option widget = "list"; label = "Hotkey keys"; group = "Hotkey"; groupOrder = 50; order = 30; visibleWhen.path = "ojuny.patch.dictation.hotkey.enable"; visibleWhen.equals = true; description = "Mango key names.";
+        ojuny.patch.dictation.hotkey.keys = [ "X" ];
+
+        # @option widget = "switch"; label = "Microphone indicator"; group = "Indicator"; groupOrder = 60; order = 10; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Add the DMS privacy indicator to the default bar and enable its microphone icon.";
+        ojuny.patch.dictation.indicator.barWidget = true;
+
+        # @option widget = "switch"; label = "Start notification"; group = "Indicator"; groupOrder = 60; order = 20; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Show a short notification when recording starts.";
+        ojuny.patch.dictation.indicator.notifyStart = true;
+
+        # @option widget = "switch"; label = "Stop notification"; group = "Indicator"; groupOrder = 60; order = 30; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Show a short notification when recording stops and transcription begins.";
+        ojuny.patch.dictation.indicator.notifyStop = true;
+
+        # @option widget = "switch"; label = "Error notification"; group = "Indicator"; groupOrder = 60; order = 40; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Show a critical notification when the backend is missing or a command fails.";
+        ojuny.patch.dictation.indicator.notifyError = true;
+      };
     };
 
   flake.modules.nixos.dictation-backend =
@@ -435,67 +494,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "dropdown"; label = "Backend"; group = "Backend"; groupOrder = 20; order = 10; choices = [ "voxtype" "superwhisper" ]; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Voxtype is local and installed by this patch. Superwhisper is external and needs a package.";
-          ojuny.patch.dictation.backend = "voxtype";
-
-          # @option widget = "package"; label = "Voxtype package"; group = "Voxtype"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "The nixpkgs Voxtype build. Use pkgs.voxtype-vulkan for the Vulkan variant.";
-          ojuny.patch.dictation.voxtype.package = pkgs.voxtype;
-
-          # @option widget = "text"; label = "Audio device"; group = "Voxtype"; groupOrder = 30; order = 20; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "PipeWire or PulseAudio source name. Use default for the system default microphone.";
-          ojuny.patch.dictation.voxtype.device = "default";
-
-          # @option widget = "dropdown"; label = "Model"; group = "Voxtype"; groupOrder = 30; order = 30; choices = [ "tiny.en" "base.en" "small.en" "medium" "large-v3-turbo" ]; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Whisper model name. Larger models are slower and use more memory.";
-          ojuny.patch.dictation.voxtype.model = "base.en";
-
-          # @option widget = "text"; label = "Model file"; group = "Voxtype"; groupOrder = 30; order = 40; advanced = true; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Absolute path to an existing model. When set, the download step is skipped.";
-          ojuny.patch.dictation.voxtype.modelFile = null;
-
-          # @option widget = "switch"; label = "Download model at service start"; group = "Voxtype"; groupOrder = 30; order = 50; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Run voxtype setup --download before the daemon starts. It is a no-op when the model already exists.";
-          ojuny.patch.dictation.voxtype.downloadModel = true;
-
-          # @option widget = "text"; label = "Language"; group = "Voxtype"; groupOrder = 30; order = 60; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Whisper language code, or auto for detection.";
-          ojuny.patch.dictation.voxtype.language = "en";
-
-          # @option widget = "dropdown"; label = "Output mode"; group = "Voxtype"; groupOrder = 30; order = 70; choices = [ "type" "clipboard" "paste" ]; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Type at the cursor, copy to the clipboard, or paste through the clipboard.";
-          ojuny.patch.dictation.voxtype.outputMode = "type";
-
-          # @option widget = "spin"; label = "Maximum recording seconds"; group = "Voxtype"; groupOrder = 30; order = 80; min = 5; max = 600; unit = "s"; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Safety limit on one recording.";
-          ojuny.patch.dictation.voxtype.maxDurationSecs = 60;
-
-          # @option widget = "switch"; label = "Pause media while recording"; group = "Voxtype"; groupOrder = 30; order = 90; advanced = true; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "voxtype"; description = "Pause MPRIS players during recording.";
-          ojuny.patch.dictation.voxtype.pauseMedia = true;
-
-          # @option widget = "package"; label = "Superwhisper package"; group = "Superwhisper"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.dictation.backend"; visibleWhen.equals = "superwhisper"; description = "External package that provides the superwhisper command. The patch does not vendor or fetch it.";
-          ojuny.patch.dictation.superwhisper.package = null;
-
-          # @option widget = "switch"; label = "Hotkey"; group = "Hotkey"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Add the Mango key binding.";
-          ojuny.patch.dictation.hotkey.enable = true;
-
-          # @option widget = "list"; label = "Hotkey modifiers"; group = "Hotkey"; groupOrder = 50; order = 20; visibleWhen.path = "ojuny.patch.dictation.hotkey.enable"; visibleWhen.equals = true; description = "Mango modifier names.";
-          ojuny.patch.dictation.hotkey.modifier = [
-            "SUPER"
-            "CTRL"
-          ];
-
-          # @option widget = "list"; label = "Hotkey keys"; group = "Hotkey"; groupOrder = 50; order = 30; visibleWhen.path = "ojuny.patch.dictation.hotkey.enable"; visibleWhen.equals = true; description = "Mango key names.";
-          ojuny.patch.dictation.hotkey.keys = [ "X" ];
-
-          # @option widget = "switch"; label = "Microphone indicator"; group = "Indicator"; groupOrder = 60; order = 10; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Add the DMS privacy indicator to the default bar and enable its microphone icon.";
-          ojuny.patch.dictation.indicator.barWidget = true;
-
-          # @option widget = "switch"; label = "Start notification"; group = "Indicator"; groupOrder = 60; order = 20; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Show a short notification when recording starts.";
-          ojuny.patch.dictation.indicator.notifyStart = true;
-
-          # @option widget = "switch"; label = "Stop notification"; group = "Indicator"; groupOrder = 60; order = 30; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Show a short notification when recording stops and transcription begins.";
-          ojuny.patch.dictation.indicator.notifyStop = true;
-
-          # @option widget = "switch"; label = "Error notification"; group = "Indicator"; groupOrder = 60; order = 40; visibleWhen.path = "ojuny.patch.dictation.enable"; visibleWhen.equals = true; description = "Show a critical notification when the backend is missing or a command fails.";
-          ojuny.patch.dictation.indicator.notifyError = true;
-        }
-
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion = allBackends ? ${cfg.backend};
@@ -551,8 +550,7 @@
               RestartSec = 5;
             };
           };
-        })
-      ];
+      };
     };
 
 }

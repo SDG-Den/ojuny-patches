@@ -16,10 +16,33 @@
     {
       options.ojuny.patch.hooks.enable = lib.mkEnableOption "typed lifecycle hooks";
 
-      # @option widget = "switch"; label = "Hooks"; group = "Hooks"; groupOrder = 10; description = "Enable typed lifecycle hooks with validation, logging and retries.";
-      config.ojuny.patch.hooks.enable = false;
-
       imports = [ self.modules.nixos.hooks-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Hooks"; group = "Hooks"; groupOrder = 10; description = "Enable typed lifecycle hooks with validation, logging and retries.";
+        ojuny.patch.hooks.enable = false;
+
+        # @option widget = "raw"; label = "Pre-rebuild hooks"; group = "Events"; groupOrder = 20; order = 10; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run by ojuny-rebuild before nixos-rebuild. Shape: name = { order = 100; command = [ ... ]; as = \"root\"; user = null; timeoutSeconds = 30; retries = 0; retryDelaySeconds = 5; onFailure = \"abort\"; environment = { }; };";
+        ojuny.patch.hooks.events.preRebuild = { };
+
+        # @option widget = "raw"; label = "Post-boot hooks"; group = "Events"; groupOrder = 20; order = 20; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run once per boot by the post-boot dispatcher.";
+        ojuny.patch.hooks.events.postBoot = { };
+
+        # @option widget = "raw"; label = "Post-update hooks"; group = "Events"; groupOrder = 20; order = 30; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run by ojuny-rebuild after a successful activation.";
+        ojuny.patch.hooks.events.postUpdate = { };
+
+        # @option widget = "text"; label = "Log directory"; group = "Logging"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Root directory for per-attempt hook logs.";
+        ojuny.patch.hooks.logging.directory = "/var/log/ojuny/hooks";
+
+        # @option widget = "spin"; label = "Keep logs for days"; group = "Logging"; groupOrder = 30; order = 20; min = 1; max = 365; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "The daily prune removes hook logs older than this.";
+        ojuny.patch.hooks.logging.retainDays = 30;
+
+        # @option widget = "switch"; label = "Log full command"; group = "Logging"; groupOrder = 30; order = 30; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Write the argv list to each attempt log. Off by default because arguments can contain secrets.";
+        ojuny.patch.hooks.logging.includeCommand = false;
+
+        # @option widget = "switch"; label = "Mark degraded generation"; group = "Rollback"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "When an aborting post-update hook fails, record the previous generation and exit 2 instead of silently accepting the update.";
+        ojuny.patch.hooks.rollback.markDegraded = true;
+      };
     };
 
   flake.modules.nixos.hooks-backend =
@@ -606,31 +629,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "raw"; label = "Pre-rebuild hooks"; group = "Events"; groupOrder = 20; order = 10; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run by ojuny-rebuild before nixos-rebuild. Shape: name = { order = 100; command = [ ... ]; as = \"root\"; user = null; timeoutSeconds = 30; retries = 0; retryDelaySeconds = 5; onFailure = \"abort\"; environment = { }; };";
-          ojuny.patch.hooks.events.preRebuild = { };
-
-          # @option widget = "raw"; label = "Post-boot hooks"; group = "Events"; groupOrder = 20; order = 20; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run once per boot by the post-boot dispatcher.";
-          ojuny.patch.hooks.events.postBoot = { };
-
-          # @option widget = "raw"; label = "Post-update hooks"; group = "Events"; groupOrder = 20; order = 30; rows = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Attrset of hooks run by ojuny-rebuild after a successful activation.";
-          ojuny.patch.hooks.events.postUpdate = { };
-
-          # @option widget = "text"; label = "Log directory"; group = "Logging"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Root directory for per-attempt hook logs.";
-          ojuny.patch.hooks.logging.directory = "/var/log/ojuny/hooks";
-
-          # @option widget = "spin"; label = "Keep logs for days"; group = "Logging"; groupOrder = 30; order = 20; min = 1; max = 365; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "The daily prune removes hook logs older than this.";
-          ojuny.patch.hooks.logging.retainDays = 30;
-
-          # @option widget = "switch"; label = "Log full command"; group = "Logging"; groupOrder = 30; order = 30; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "Write the argv list to each attempt log. Off by default because arguments can contain secrets.";
-          ojuny.patch.hooks.logging.includeCommand = false;
-
-          # @option widget = "switch"; label = "Mark degraded generation"; group = "Rollback"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.hooks.enable"; visibleWhen.equals = true; description = "When an aborting post-update hook fails, record the previous generation and exit 2 instead of silently accepting the update.";
-          ojuny.patch.hooks.rollback.markDegraded = true;
-        }
-
-        (lib.mkIf (patchesEnabled && cfg.enable) {
+      config = lib.mkIf (patchesEnabled && cfg.enable) {
           assertions = hookAssertions;
 
           warnings =
@@ -706,7 +705,6 @@
               Persistent = true;
             };
           };
-        })
-      ];
+      };
     };
 }

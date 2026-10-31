@@ -42,12 +42,42 @@ in
     {
       options.ojuny.patch.secrets.enable = lib.mkEnableOption "the age or sops secrets patch";
 
-      # @option widget = "switch"; label = "Secrets"; group = "Secrets"; description = "Enable age-encrypted or sops secrets.";
-      config.ojuny.patch.secrets.enable = false;
-
       imports = lib.optionals hasSops [ inputs.sops-nix.nixosModules.sops ] ++ [
         self.modules.nixos.secrets-backend
       ];
+
+      config = {
+        # @option widget = "switch"; label = "Secrets"; group = "Secrets"; description = "Enable age-encrypted or sops secrets.";
+        ojuny.patch.secrets.enable = false;
+
+        # @option widget = "dropdown"; label = "Backend"; group = "Backend"; choices = [ "age" "sops" ]; description = "age decrypts individual files. sops decrypts a sops file with the same age identity.";
+        ojuny.patch.secrets.backend = "age";
+
+        # @option widget = "path"; label = "Key file"; group = "Advanced"; hidden = true; description = "Age identity file used by the age or sops backend. It must stay outside the flake and the Nix store.";
+        ojuny.patch.secrets.keyFile = "/var/lib/ojuny-age/keys.txt";
+
+        # @option widget = "path"; label = "Sops file"; group = "Sops"; nullable = true; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "sops"; description = "Encrypted sops file in the flake, for example ./secrets.yaml.";
+        ojuny.patch.secrets.sopsFile = null;
+
+        # @option widget = "dropdown"; label = "Sops format"; group = "Sops"; choices = [ "yaml" "json" "ini" "dotenv" "binary" ]; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "sops";
+        ojuny.patch.secrets.sopsFormat = "yaml";
+
+        # @option widget = "table-attrset"; label = "Sops secrets"; group = "Sops"; columns = [ "key" "owner" "group" "mode" ]; columnTypes = [ "str" "str" "str" "str" ]; keyEditable = true; description = "Named secrets read from the sops file. The key defaults to the secret name."; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "sops";
+        ojuny.patch.secrets.sopsSecrets = { };
+
+        # @option widget = "text"; label = "Destination"; group = "Advanced"; hidden = true; description = "Runtime directory for decrypted age files."; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "age";
+        ojuny.patch.secrets.destination = "/run/secrets";
+
+        # @option widget = "table-attrset"; label = "Secret files"; group = "Secrets"; columns = [ "source" "owner" "group" "mode" ]; columnTypes = [ "str" "str" "str" "str" ]; keyEditable = true; description = "Named age files and their installed permissions."; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "age";
+        ojuny.patch.secrets.files = { };
+
+        /*
+          @insert
+          name = "secret";
+          group = "Secrets";
+          order = 10;
+        */
+      };
     };
 
   flake.modules.nixos.secrets-backend =
@@ -217,35 +247,6 @@ in
       };
 
       config = lib.mkMerge [
-        {
-          # @option widget = "dropdown"; label = "Backend"; group = "Backend"; choices = [ "age" "sops" ]; description = "age decrypts individual files. sops decrypts a sops file with the same age identity.";
-          ojuny.patch.secrets.backend = "age";
-
-          # @option widget = "path"; label = "Key file"; group = "Advanced"; hidden = true; description = "Age identity file used by the age or sops backend. It must stay outside the flake and the Nix store.";
-          ojuny.patch.secrets.keyFile = "/var/lib/ojuny-age/keys.txt";
-
-          # @option widget = "path"; label = "Sops file"; group = "Sops"; nullable = true; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "sops"; description = "Encrypted sops file in the flake, for example ./secrets.yaml.";
-          ojuny.patch.secrets.sopsFile = null;
-
-          # @option widget = "dropdown"; label = "Sops format"; group = "Sops"; choices = [ "yaml" "json" "ini" "dotenv" "binary" ]; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "sops";
-          ojuny.patch.secrets.sopsFormat = "yaml";
-
-          # @option widget = "table-attrset"; label = "Sops secrets"; group = "Sops"; columns = [ "key" "owner" "group" "mode" ]; columnTypes = [ "str" "str" "str" "str" ]; keyEditable = true; description = "Named secrets read from the sops file. The key defaults to the secret name."; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "sops";
-          ojuny.patch.secrets.sopsSecrets = { };
-
-          # @option widget = "text"; label = "Destination"; group = "Advanced"; hidden = true; description = "Runtime directory for decrypted age files."; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "age";
-          ojuny.patch.secrets.destination = "/run/secrets";
-
-          # @option widget = "table-attrset"; label = "Secret files"; group = "Secrets"; columns = [ "source" "owner" "group" "mode" ]; columnTypes = [ "str" "str" "str" "str" ]; keyEditable = true; description = "Named age files and their installed permissions."; visibleWhen.path = "ojuny.patch.secrets.backend"; visibleWhen.equals = "age";
-          ojuny.patch.secrets.files = { };
-
-          /*
-            @insert
-            name = "secret";
-            group = "Secrets";
-            order = 10;
-          */
-        }
         (lib.mkIf cfg.enable {
           assertions = [
             {

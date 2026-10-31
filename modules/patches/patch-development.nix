@@ -13,17 +13,87 @@
 {
   flake.modules.nixos.patch-development =
     { config, lib, ... }:
+    let
+      languageNames = [
+        "nix"
+        "python"
+        "rust"
+        "c"
+        "cpp"
+        "go"
+        "typescript"
+        "lua"
+        "bash"
+        "yaml"
+        "json"
+        "markdown"
+      ];
+
+      defaultLanguages = [
+        "nix"
+        "python"
+        "rust"
+        "c"
+        "cpp"
+        "bash"
+      ];
+    in
     {
       options.ojuny.patch.development.enable = lib.mkEnableOption "the development patch";
 
-      # @option widget = "switch"; label = "Development patch"; group = "Patches"; description = "Install VSCodium, the selected language servers, optional coding agents, and project tooling.";
-      config.ojuny.patch.development.enable = false;
-
       imports = [ self.modules.nixos.development-backend ];
 
-      config.home-manager.sharedModules = lib.mkIf (
-        config.ojuny.patch.development.enable && (config.ojuny.patches or true)
-      ) [ self.modules.homeManager.development-backend ];
+      config = {
+        # @option widget = "switch"; label = "Development patch"; group = "Patches"; description = "Install VSCodium, the selected language servers, optional coding agents, and project tooling.";
+        ojuny.patch.development.enable = false;
+
+        # @option widget = "table-attrset"; label = "Languages"; group = "Languages"; columns = [ "enable" ]; columnTypes = [ "bool" ]; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Languages whose LSP server, formatter, and editor extension are installed.";
+        ojuny.patch.development.languages = lib.genAttrs languageNames (name: {
+          enable = builtins.elem name defaultLanguages;
+        });
+
+        # @option widget = "switch"; label = "VSCodium"; group = "Editor"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install and theme VSCodium and use the nix profile as the default launcher.";
+        ojuny.patch.development.editors.vscodium.enable = true;
+
+        # @option widget = "table-attrset"; label = "Coding agents"; group = "AI"; columns = [ "enable" ]; columnTypes = [ "bool" ]; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Opt-in coding agents. No agent is installed by the base image.";
+        ojuny.patch.development.agents = {
+          opencode.enable = true;
+          claude-code.enable = false;
+          codex.enable = false;
+          gemini-cli.enable = false;
+        };
+
+        # @option widget = "dropdown"; label = "Default agent"; group = "AI"; choices = [ "opencode" "claude-code" "codex" "gemini-cli" "none" ]; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Agent launched by ojuny-agent. It must be enabled, or none.";
+        ojuny.patch.development.defaultAgent = "opencode";
+
+        # @option widget = "switch"; label = "Agent usage"; group = "AI"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install ojuny-agent-usage. ccusage covers Claude Code and Codex; OpenCode usage is not collected.";
+        ojuny.patch.development.usage.enable = true;
+
+        # @option widget = "switch"; label = "Project menu"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install the projects picker, its alias, and the Super+Shift+Tab keybind.";
+        ojuny.patch.development.projects.enable = true;
+
+        # @option widget = "text"; label = "Project search root"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Directory searched for git repositories. $OJUNY_REPO_PATH is expanded by the shell.";
+        ojuny.patch.development.projects.searchRoot = "$OJUNY_REPO_PATH/..";
+
+        # @option widget = "text"; label = "Project editor command"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Single executable used by the project picker, for example codium or code.";
+        ojuny.patch.development.projects.editorCommand = "codium";
+
+        # @option widget = "text"; label = "Project terminal command"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Terminal opened by the project picker for the chosen repository.";
+        ojuny.patch.development.projects.terminalCommand = "ghostty";
+
+        # @option widget = "text"; label = "Project agent command"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Coding agent started by the project picker inside the chosen repository.";
+        ojuny.patch.development.projects.assistantCommand = "opencode";
+
+        # @option widget = "switch"; label = "Project scaffolding"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install ojuny-devshell-new for pinned language project flakes.";
+        ojuny.patch.development.scaffold.enable = true;
+
+        # @option widget = "text"; label = "Scaffold nixpkgs revision"; group = "Projects"; advanced = true; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Revision or branch written into built-in fallback flakes. Upstream templates keep their own pin. The host nixpkgs revision is the default.";
+        ojuny.patch.development.scaffold.nixpkgsRev = inputs.nixpkgs.rev or "nixos-unstable";
+
+        home-manager.sharedModules = lib.mkIf (
+          config.ojuny.patch.development.enable && (config.ojuny.patches or true)
+        ) [ self.modules.homeManager.development-backend ];
+      };
     };
 
   flake.modules.nixos.development-backend =
@@ -100,12 +170,42 @@
         bash = [ "bashInteractive" "bash-language-server" "shellcheck" "shfmt" ];
       };
 
+      templateLanguageMap = {
+        the-nix-way = {
+          bash = "shell";
+          c = "c-cpp";
+          cpp = "c-cpp";
+          go = "go";
+          nix = "nix";
+          python = "python";
+          rust = "rust";
+        };
+        NixOS = {
+          bash = "bash-hello";
+          c = "c-hello";
+          go = "go-hello";
+          python = "python";
+          rust = "rust";
+          typescript = "typescript";
+        };
+      };
+
+      sortedTemplateRepos = lib.sort (a: b: a.priority < b.priority) cfg.scaffold.templateRepos;
+
       scaffoldCase = lib.concatStringsSep "\n" (
         lib.mapAttrsToList (
           name: packages:
+          let
+            templates = lib.concatMap (
+              repo:
+              let template = templateLanguageMap.${repo.name}.${name} or null;
+              in lib.optional (template != null) "${repo.name}|${repo.url}|${template}"
+            ) sortedTemplateRepos;
+          in
           ''
             ${name})
               packages="${lib.concatStringsSep " " packages}"
+              templates=${lib.escapeShellArg (lib.concatStringsSep "\n" templates)}
               ;;
           ''
         ) scaffoldPackages
@@ -118,41 +218,103 @@
             [
               findutils
               coreutils
+              git
               gnugrep
-              fzf
-              eza
+              xdg-utils
             ]
           )
         }:"$PATH"
 
-        DIR="''${1:-${cfg.projects.searchRoot}}"
-        REPOS=$(find "$DIR" -maxdepth 5 -name .git -type d -exec dirname {} \; | xargs -r -I {} readlink -f {})
-        if [ -n "''${2:-}" ]; then
-          SELECTED=$(printf '%s\n' "$REPOS" | grep -E "$2" | head -n 1)
-        else
-          SELECTED=$(printf '%s\n' "$REPOS" | fzf --layout=reverse --preview="eza -al --color=always --group-directories-first --icons=always {}")
+        if ! command -v dms >/dev/null 2>&1; then
+          echo "projects: dms is required for the project picker; install DankMaterialShell or use ojuny-devshell-new for a project shell" >&2
+          exit 1
         fi
+
+        DIR="''${1:-${cfg.projects.searchRoot}}"
+
+        REPOS=$(find "$DIR" -maxdepth 5 -name .git -type d -exec dirname {} \; 2>/dev/null | xargs -r -I {} readlink -f {})
+        if [ -z "$REPOS" ]; then
+          echo "projects: no git repositories under $DIR" >&2
+          exit 0
+        fi
+
+        repo_rows() {
+          printf '%s\n' "$REPOS" | while IFS= read -r repo; do
+            branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD 2>/dev/null) || branch="no-git"
+            subject=$(git -C "$repo" log -1 --format='%h %s' 2>/dev/null | cut -c1-72) || subject=""
+            [ -n "$subject" ] || subject="no commits"
+            printf '%s\0display\x1f%s  [%s]  %s\n' "$repo" "''${repo#"$DIR"/}" "$branch" "$subject"
+          done
+        }
+
+        if [ -n "''${2:-}" ]; then
+          SELECTED=$(printf '%s\n' "$REPOS" | grep -E -- "$2" | head -n 1)
+        else
+          SELECTED=$(repo_rows | dms dmenu --prompt "Project" --lines 12 --format s)
+        fi
+
         if [ -z "$SELECTED" ]; then
           exit 0
         fi
-        if [ -f "$SELECTED/meson.build" ]; then
-          DB_DIR="$HOME/.cache/clangd/$(basename "$SELECTED")"
-          mkdir -p "$DB_DIR"
-          cd "$SELECTED"
-          nix develop -c zsh -c "meson setup \"$DB_DIR\" \"$SELECTED\" >/dev/null 2>&1 || true; ${lib.escapeShellArg cfg.projects.editorCommand} -n \"$SELECTED\""
-        elif cd "$SELECTED" && nix develop -c true; then
-          nix develop -c ${lib.escapeShellArg cfg.projects.editorCommand} -n "$SELECTED"
-        else
-          ${lib.escapeShellArg cfg.projects.editorCommand} -n "$SELECTED"
+
+        ACTION=$(printf '%s\n' \
+          "Open in editor" \
+          "Open terminal" \
+          "Start agent" \
+          "Open Obsidian vault" \
+          "Cancel" \
+          | dms dmenu --prompt "$(basename "$SELECTED")" --lines 6 --no-custom)
+
+        if [ -z "$ACTION" ] || [ "$ACTION" = "Cancel" ]; then
+          exit 0
         fi
+
+        editor=${lib.escapeShellArg cfg.projects.editorCommand}
+        terminal=${lib.escapeShellArg cfg.projects.terminalCommand}
+        assistant=${lib.escapeShellArg cfg.projects.assistantCommand}
+
+        run_in_devshell() {
+          if [ -f "$SELECTED/flake.nix" ] || [ -f "$SELECTED/shell.nix" ]; then
+            if ( cd "$SELECTED" && nix develop -c true >/dev/null 2>&1 ); then
+              ( cd "$SELECTED" && nix develop -c "$@" )
+              return
+            fi
+          fi
+          ( cd "$SELECTED" && "$@" )
+        }
+
+        case "$ACTION" in
+          "Open in editor")
+            if [ -f "$SELECTED/meson.build" ]; then
+              DB_DIR="$HOME/.cache/clangd/$(basename "$SELECTED")"
+              mkdir -p "$DB_DIR"
+              ( cd "$SELECTED" && nix develop -c zsh -c "meson setup \"$DB_DIR\" \"$SELECTED\" >/dev/null 2>&1 || true; $editor -n \"$SELECTED\"" )
+            else
+              run_in_devshell "$editor" -n "$SELECTED"
+            fi
+            ;;
+          "Open terminal")
+            run_in_devshell "$terminal"
+            ;;
+          "Start agent")
+            run_in_devshell "$assistant"
+            ;;
+          "Open Obsidian vault")
+            vault_path="$SELECTED"
+            vault_path="''${vault_path// /%20}"
+            xdg-open "obsidian://open?path=$vault_path" >/dev/null 2>&1 &
+            ;;
+        esac
       '';
 
       scaffold = pkgs.writeShellScriptBin "ojuny-devshell-new" ''
-        export PATH=${lib.makeBinPath (with pkgs; [ coreutils gnused ])}:"$PATH"
+        export PATH=${lib.makeBinPath (with pkgs; [ coreutils gnused findutils ])}:"$PATH"
         set -euo pipefail
 
         language="''${1:-}"
         dir="''${2:-$PWD}"
+        used_repo=""
+        used_template=""
 
         case "$language" in
         ${scaffoldCase}
@@ -168,34 +330,50 @@
           exit 1
         fi
 
-        cat > "$dir/flake.nix" <<'EOF'
-        {
-          description = "Ojuny @LANGUAGE@ development shell";
-          inputs.nixpkgs.url = "github:NixOS/nixpkgs/@NIXPKGS_REV@";
-          outputs = { self, nixpkgs }:
-            let
-              system = "@SYSTEM@";
-              pkgs = nixpkgs.legacyPackages.''${system};
-            in {
-              devShells.''${system}.default = pkgs.mkShell {
-                packages = with pkgs; [ @PACKAGES@ ];
+        while IFS='|' read -r repo_name repo_url repo_template; do
+          [ -n "$repo_name" ] || continue
+          if ( cd "$dir" && nix flake init -t "$repo_url#$repo_template" ); then
+            used_repo="$repo_name"
+            used_template="$repo_template"
+            break
+          fi
+          echo "ojuny-devshell-new: $repo_name#$repo_template is unavailable, trying the next template source" >&2
+        done <<< "$templates"
+
+        if [ -z "$used_repo" ]; then
+          cat > "$dir/flake.nix" <<'EOF'
+          {
+            description = "Ojuny @LANGUAGE@ development shell";
+            inputs.nixpkgs.url = "github:NixOS/nixpkgs/@NIXPKGS_REV@";
+            outputs = { self, nixpkgs }:
+              let
+                system = "@SYSTEM@";
+                pkgs = nixpkgs.legacyPackages.''${system};
+              in {
+                devShells.''${system}.default = pkgs.mkShell {
+                  packages = with pkgs; [ @PACKAGES@ ];
+                };
               };
-            };
-        }
+          }
         EOF
 
-        sed -i \
-          -e "s|@LANGUAGE@|$language|g" \
-          -e "s|@NIXPKGS_REV@|${cfg.scaffold.nixpkgsRev}|g" \
-          -e "s|@SYSTEM@|${pkgs.stdenv.hostPlatform.system}|g" \
-          -e "s|@PACKAGES@|$packages|g" \
-          "$dir/flake.nix"
+          sed -i \
+            -e "s|@LANGUAGE@|$language|g" \
+            -e "s|@NIXPKGS_REV@|${cfg.scaffold.nixpkgsRev}|g" \
+            -e "s|@SYSTEM@|${pkgs.stdenv.hostPlatform.system}|g" \
+            -e "s|@PACKAGES@|$packages|g" \
+            "$dir/flake.nix"
+        fi
 
         if [ ! -e "$dir/.gitignore" ]; then
           printf '%s\n' "result" ".direnv" > "$dir/.gitignore"
         fi
 
-        echo "Created $dir/flake.nix"
+        if [ -n "$used_repo" ]; then
+          echo "Created $dir from $used_repo#$used_template"
+        else
+          echo "Created $dir/flake.nix from the built-in $language template"
+        fi
         echo "Next: cd $dir && nix flake lock && nix develop"
       '';
     in
@@ -274,6 +452,16 @@
             default = "codium";
             description = "Single executable used by the project picker, for example codium or code.";
           };
+          terminalCommand = lib.mkOption {
+            type = lib.types.str;
+            default = "ghostty";
+            description = "Terminal opened by the project picker for the chosen repository.";
+          };
+          assistantCommand = lib.mkOption {
+            type = lib.types.str;
+            default = "opencode";
+            description = "Coding agent started by the project picker inside the chosen repository.";
+          };
         };
 
         scaffold = {
@@ -285,7 +473,41 @@
           nixpkgsRev = lib.mkOption {
             type = lib.types.str;
             default = inputs.nixpkgs.rev or "nixos-unstable";
-            description = "Revision or branch written into generated project flakes.";
+            description = "Revision or branch written into built-in fallback flakes. Upstream templates keep their own nixpkgs pin.";
+          };
+          templateRepos = lib.mkOption {
+            type = lib.types.listOf (
+              lib.types.submodule {
+                options = {
+                  name = lib.mkOption {
+                    type = lib.types.str;
+                    description = "Repository identifier used to look up the per-language template names.";
+                  };
+                  url = lib.mkOption {
+                    type = lib.types.str;
+                    description = "Pinned flake reference passed to nix flake init -t.";
+                  };
+                  priority = lib.mkOption {
+                    type = lib.types.int;
+                    default = 0;
+                    description = "Tried in ascending order; the lowest priority value wins.";
+                  };
+                };
+              }
+            );
+            default = [
+              {
+                name = "the-nix-way";
+                url = "github:the-nix-way/dev-templates/9ffac48bbda3ba44e58e250d9a57d4520ce55401";
+                priority = 10;
+              }
+              {
+                name = "NixOS";
+                url = "github:NixOS/templates/3348e5b68b7a53c1ef9d20605c3cad169f65899a";
+                priority = 20;
+              }
+            ];
+            description = "Template flake repositories tried in ascending priority order. A repository without a mapping for the requested language is skipped.";
           };
         };
       };
@@ -310,47 +532,7 @@
         description = "Shell aliases keyed by name, converted to environment.shellAliases.";
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "table-attrset"; label = "Languages"; group = "Languages"; columns = [ "enable" ]; columnTypes = [ "bool" ]; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Languages whose LSP server, formatter, and editor extension are installed.";
-          ojuny.patch.development.languages = lib.genAttrs languageNames (name: {
-            enable = builtins.elem name defaultLanguages;
-          });
-
-          # @option widget = "switch"; label = "VSCodium"; group = "Editor"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install and theme VSCodium and use the nix profile as the default launcher.";
-          ojuny.patch.development.editors.vscodium.enable = true;
-
-          # @option widget = "table-attrset"; label = "Coding agents"; group = "AI"; columns = [ "enable" ]; columnTypes = [ "bool" ]; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Opt-in coding agents. No agent is installed by the base image.";
-          ojuny.patch.development.agents = {
-            opencode.enable = true;
-            claude-code.enable = false;
-            codex.enable = false;
-            gemini-cli.enable = false;
-          };
-
-          # @option widget = "dropdown"; label = "Default agent"; group = "AI"; choices = [ "opencode" "claude-code" "codex" "gemini-cli" "none" ]; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Agent launched by ojuny-agent. It must be enabled, or none.";
-          ojuny.patch.development.defaultAgent = "opencode";
-
-          # @option widget = "switch"; label = "Agent usage"; group = "AI"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install ojuny-agent-usage. ccusage covers Claude Code and Codex; OpenCode usage is not collected.";
-          ojuny.patch.development.usage.enable = true;
-
-          # @option widget = "switch"; label = "Project menu"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install the projects picker, its alias, and the Super+Shift+Tab keybind.";
-          ojuny.patch.development.projects.enable = true;
-
-          # @option widget = "text"; label = "Project search root"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Directory searched for git repositories. $OJUNY_REPO_PATH is expanded by the shell.";
-          ojuny.patch.development.projects.searchRoot = "$OJUNY_REPO_PATH/..";
-
-          # @option widget = "text"; label = "Project editor command"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Single executable used by the project picker, for example codium or code.";
-          ojuny.patch.development.projects.editorCommand = "codium";
-
-          # @option widget = "switch"; label = "Project scaffolding"; group = "Projects"; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Install ojuny-devshell-new for pinned language project flakes.";
-          ojuny.patch.development.scaffold.enable = true;
-
-          # @option widget = "text"; label = "Scaffold nixpkgs revision"; group = "Projects"; advanced = true; visibleWhen.path = "ojuny.patch.development.enable"; visibleWhen.equals = true; description = "Revision or branch written into generated project flakes. The host nixpkgs revision is the default.";
-          ojuny.patch.development.scaffold.nixpkgsRev = inputs.nixpkgs.rev or "nixos-unstable";
-        }
-
-        (lib.mkIf active {
+      config = lib.mkIf active {
           assertions = [
             {
               assertion =
@@ -417,8 +599,7 @@
               lib.filterAttrs (_: entry: entry.enable) config.ojuny.apps.development.aliases
             )
           );
-        })
-      ];
+      };
     };
 
   flake.modules.homeManager.development-backend =

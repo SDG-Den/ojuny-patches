@@ -3,7 +3,7 @@
   displayname = "Screen recording";
   icon = "media-record-symbolic";
   order = 220;
-  description = "GPU screen recording, replay buffer, audio and webcam overlay";
+  description = "GPU screen recording, replay buffer, audio and a patch-scoped webcam overlay. Camera capture works out of the box; there is no standalone camera page";
   category = "Patches";
   systems = [ "all" ];
 */
@@ -23,6 +23,284 @@
     };
 
   flake.modules.nixos.screenrecord-backend =
+    { lib, ... }:
+    {
+      imports = [ self.modules.nixos.screenrecord-install ];
+
+      options.ojuny.patch.screenrecord = {
+        backend = lib.mkOption {
+          type = lib.types.enum [
+            "auto"
+            "gpu-screen-recorder"
+            "wf-recorder"
+          ];
+          default = "auto";
+          description = "Recorder backend. auto prefers gpu-screen-recorder and falls back to wf-recorder.";
+        };
+
+        target = lib.mkOption {
+          type = lib.types.enum [
+            "region"
+            "fullscreen"
+          ];
+          default = "region";
+          description = "Capture target. region opens the slurp picker.";
+        };
+
+        outputDir = lib.mkOption {
+          type = lib.types.str;
+          default = "~/Videos";
+          description = "Recording output directory. A leading ~ expands to the user home.";
+        };
+
+        frameRate = lib.mkOption {
+          type = lib.types.ints.between 15 240;
+          default = 60;
+          description = "Capture frame rate.";
+        };
+
+        resolution = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Optional WxH for gpu-screen-recorder. Empty means native.";
+        };
+
+        audio = {
+          desktop = {
+            enable = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Record desktop audio.";
+            };
+            sink = lib.mkOption {
+              type = lib.types.str;
+              default = "";
+              description = "Sink name. Empty follows the default sink.";
+            };
+            mute = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Omit desktop audio at start.";
+            };
+          };
+
+          microphone = {
+            enable = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Record microphone audio.";
+            };
+            source = lib.mkOption {
+              type = lib.types.str;
+              default = "";
+              description = "Source name. Empty follows the default source.";
+            };
+            mute = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Omit microphone audio at start.";
+            };
+          };
+
+          levelMeter = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Install cava and pavucontrol and expose the level command.";
+          };
+        };
+
+        webcam = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Start the patch-scoped webcam overlay with a recording.";
+          };
+          device = lib.mkOption {
+            type = lib.types.str;
+            default = "";
+            description = "V4L2 device. Empty probes the video nodes and picks the first capture node.";
+          };
+          size = lib.mkOption {
+            type = lib.types.enum [
+              "small"
+              "medium"
+              "large"
+            ];
+            default = "medium";
+            description = "Overlay height preset.";
+          };
+          position = lib.mkOption {
+            type = lib.types.enum [
+              "top-left"
+              "top-right"
+              "bottom-left"
+              "bottom-right"
+            ];
+            default = "bottom-right";
+            description = "Overlay position inside the recorded region or active monitor.";
+          };
+          crop = lib.mkOption {
+            type = lib.types.enum [
+              "8:9"
+              "1:1"
+              "16:9"
+            ];
+            default = "8:9";
+            description = "Camera crop shape.";
+          };
+          format = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "V4L2 pixel format such as MJPG or YUYV. Null uses the device default.";
+          };
+          resolution = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Capture resolution as WxH, for example 1280x720. Null uses the device default.";
+          };
+        };
+
+        buffer = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable the replay buffer commands and binds.";
+          };
+          seconds = lib.mkOption {
+            type = lib.types.ints.between 10 300;
+            default = 30;
+            description = "Replay buffer length in seconds.";
+          };
+        };
+
+        indicator = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Install the DMS recording indicator.";
+          };
+          style = lib.mkOption {
+            type = lib.types.enum [
+              "plugin"
+              "privacy"
+            ];
+            default = "plugin";
+            description = "plugin installs the dedicated recording pill. privacy relies on the existing DMS privacy indicator.";
+          };
+          barId = lib.mkOption {
+            type = lib.types.str;
+            default = "default";
+            description = "DMS bar configuration that receives the widget.";
+          };
+        };
+
+        obs = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Install OBS Studio and optional global binds.";
+          };
+          globalBinds = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Add Mango global-key rules for OBS.";
+          };
+        };
+
+        binds = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Add the Mango recording binds.";
+          };
+        };
+      };
+
+      config = {
+        # @option widget = "dropdown"; label = "Backend"; group = "Capture"; groupOrder = 20; order = 10; choices = [ "auto" "gpu-screen-recorder" "wf-recorder" ]; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "auto prefers gpu-screen-recorder and falls back to wf-recorder. wf-recorder uses CPU encoding and has no replay buffer."
+        ojuny.patch.screenrecord.backend = "auto";
+
+        # @option widget = "dropdown"; label = "Capture target"; group = "Capture"; groupOrder = 20; order = 20; choices = [ "region" "fullscreen" ]; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "region opens the slurp picker. fullscreen records the active monitor."
+        ojuny.patch.screenrecord.target = "region";
+
+        # @option widget = "text"; label = "Output directory"; group = "Capture"; groupOrder = 20; order = 30; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Directory for recordings. ~ expands to the user home."
+        ojuny.patch.screenrecord.outputDir = "~/Videos";
+
+        # @option widget = "spin"; label = "Frame rate"; group = "Capture"; groupOrder = 20; order = 40; min = 15; max = 240; step = 5; unit = "fps"; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Capture frame rate. 60 is the default. Lower values reduce file size and CPU fallback load."
+        ojuny.patch.screenrecord.frameRate = 60;
+
+        # @option widget = "text"; label = "Resolution"; group = "Capture"; groupOrder = 20; order = 50; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Optional WxH for gpu-screen-recorder, for example 1920x1080. Empty means native resolution. Ignored by wf-recorder."
+        ojuny.patch.screenrecord.resolution = "";
+
+        # @option widget = "switch"; label = "Desktop audio"; group = "Audio"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Record the selected sink monitor source."
+        ojuny.patch.screenrecord.audio.desktop.enable = true;
+
+        # @option widget = "text"; label = "Desktop sink"; group = "Audio"; groupOrder = 30; order = 20; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.audio.desktop.enable"; visibleWhen.equals = true; description = "Sink name. Empty follows the current default sink. Use ojuny-screenrecord list-sinks to list names."
+        ojuny.patch.screenrecord.audio.desktop.sink = "";
+
+        # @option widget = "switch"; label = "Mute desktop at start"; group = "Audio"; groupOrder = 30; order = 30; visibleWhen.path = "ojuny.patch.screenrecord.audio.desktop.enable"; visibleWhen.equals = true; description = "Omit desktop audio from this recording. This does not change the global sink mute."
+        ojuny.patch.screenrecord.audio.desktop.mute = false;
+
+        # @option widget = "switch"; label = "Microphone"; group = "Audio"; groupOrder = 30; order = 40; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Record the selected microphone source. Off by default so a global recording bind does not silently open the microphone."
+        ojuny.patch.screenrecord.audio.microphone.enable = false;
+
+        # @option widget = "text"; label = "Microphone source"; group = "Audio"; groupOrder = 30; order = 50; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.audio.microphone.enable"; visibleWhen.equals = true; description = "Source name. Empty follows the current default source. Use ojuny-screenrecord list-sources to list names."
+        ojuny.patch.screenrecord.audio.microphone.source = "";
+
+        # @option widget = "switch"; label = "Mute microphone at start"; group = "Audio"; groupOrder = 30; order = 60; visibleWhen.path = "ojuny.patch.screenrecord.audio.microphone.enable"; visibleWhen.equals = true; description = "Omit microphone audio from this recording. This does not change the global source mute."
+        ojuny.patch.screenrecord.audio.microphone.mute = false;
+
+        # @option widget = "switch"; label = "Level meter"; group = "Audio"; groupOrder = 30; order = 70; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Install cava and pavucontrol and expose ojuny-screenrecord level. The meter runs only on demand."
+        ojuny.patch.screenrecord.audio.levelMeter = false;
+
+        # @option widget = "switch"; label = "Webcam overlay"; group = "Webcam"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Start the patch-scoped webcam overlay with a recording and include it in the captured region. Camera capture works out of the box; there is no standalone camera page and no detection UI."
+        ojuny.patch.screenrecord.webcam.enable = false;
+
+        # @option widget = "text"; label = "Camera device"; group = "Webcam"; groupOrder = 40; order = 20; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "V4L2 device such as /dev/video0. Empty probes the video nodes and picks the first that reports a capture format, so a metadata node is skipped. Use ojuny-screenrecord list-devices to list devices."
+        ojuny.patch.screenrecord.webcam.device = "";
+
+        # @option widget = "dropdown"; label = "Overlay size"; group = "Webcam"; groupOrder = 40; order = 30; choices = [ "small" "medium" "large" ]; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Overlay height preset: 270, 405, or 540 pixels."
+        ojuny.patch.screenrecord.webcam.size = "medium";
+
+        # @option widget = "dropdown"; label = "Overlay position"; group = "Webcam"; groupOrder = 40; order = 40; choices = [ "top-left" "top-right" "bottom-left" "bottom-right" ]; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Position inside the recorded region, or inside the active monitor for fullscreen recordings."
+        ojuny.patch.screenrecord.webcam.position = "bottom-right";
+
+        # @option widget = "dropdown"; label = "Overlay shape"; group = "Webcam"; groupOrder = 40; order = 50; choices = [ "8:9" "1:1" "16:9" ]; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Crop applied to the camera feed. 8:9 matches the Omarchy portrait overlay."
+        ojuny.patch.screenrecord.webcam.crop = "8:9";
+
+        # @option widget = "text"; label = "Capture format"; group = "Webcam"; groupOrder = 40; order = 60; nullable = true; placeholder = "Device default"; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Four-character V4L2 pixel format such as MJPG or YUYV. Leave unset to use the device default. An unknown value is rejected and the overlay keeps the device default. Use ojuny-screenrecord list-formats to list supported values."
+        ojuny.patch.screenrecord.webcam.format = null;
+
+        # @option widget = "text"; label = "Capture resolution"; group = "Webcam"; groupOrder = 40; order = 70; nullable = true; placeholder = "Device default"; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Resolution as WxH, for example 1280x720. Leave unset to use the device default. The format must be supported at that size. Use ojuny-screenrecord list-formats to list supported values."
+        ojuny.patch.screenrecord.webcam.resolution = null;
+
+        # @option widget = "switch"; label = "Replay buffer"; group = "Replay buffer"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Enable the last-minute buffer and its Mango binds. Requires gpu-screen-recorder."
+        ojuny.patch.screenrecord.buffer.enable = false;
+
+        # @option widget = "spin"; label = "Buffer length"; group = "Replay buffer"; groupOrder = 50; order = 20; min = 10; max = 300; step = 5; unit = "s"; visibleWhen.path = "ojuny.patch.screenrecord.buffer.enable"; visibleWhen.equals = true; description = "Seconds kept in memory. Memory cost grows with bitrate and length."
+        ojuny.patch.screenrecord.buffer.seconds = 30;
+
+        # @option widget = "switch"; label = "Recording indicator"; group = "Indicator"; groupOrder = 60; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Install the DMS recording pill. It shows the duration and stops the recording on click."
+        ojuny.patch.screenrecord.indicator.enable = true;
+
+        # @option widget = "dropdown"; label = "Indicator style"; group = "Indicator"; groupOrder = 60; order = 20; choices = [ "plugin" "privacy" ]; visibleWhen.path = "ojuny.patch.screenrecord.indicator.enable"; visibleWhen.equals = true; description = "plugin installs the dedicated recording pill. privacy relies only on the existing DMS privacy indicator."
+        ojuny.patch.screenrecord.indicator.style = "plugin";
+
+        # @option widget = "text"; label = "Bar ID"; group = "Indicator"; groupOrder = 60; order = 30; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.indicator.style"; visibleWhen.equals = "plugin"; description = "DMS bar configuration that receives the widget. The default bar is named default."
+        ojuny.patch.screenrecord.indicator.barId = "default";
+
+        # @option widget = "switch"; label = "OBS Studio"; group = "OBS"; groupOrder = 70; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Install OBS for scenes and streaming. OBS is not driven by ojuny-screenrecord in v1."
+        ojuny.patch.screenrecord.obs.enable = false;
+
+        # @option widget = "switch"; label = "OBS global binds"; group = "OBS"; groupOrder = 70; order = 20; visibleWhen.path = "ojuny.patch.screenrecord.obs.enable"; visibleWhen.equals = true; description = "Add Mango global_key_binding rules for super+alt+o and super+alt+p. Configure the matching OBS hotkeys."
+        ojuny.patch.screenrecord.obs.globalBinds = true;
+
+        # @option widget = "switch"; label = "Mango keybinds"; group = "Keybinds"; groupOrder = 80; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Add the recording, replay and webcam binds. Chords are SUPER+ALT+R, B, S and W."
+        ojuny.patch.screenrecord.binds.enable = true;
+      };
+    };
+
+  flake.modules.nixos.screenrecord-install =
     {
       config,
       lib,
@@ -96,6 +374,10 @@
           webcam_size=${lib.escapeShellArg cfg.webcam.size}
           webcam_position=${lib.escapeShellArg cfg.webcam.position}
           webcam_crop=${lib.escapeShellArg cfg.webcam.crop}
+          webcam_format=${lib.escapeShellArg (if cfg.webcam.format == null then "" else cfg.webcam.format)}
+          webcam_resolution=${
+            lib.escapeShellArg (if cfg.webcam.resolution == null then "" else cfg.webcam.resolution)
+          }
           buffer_enabled=${lib.escapeShellArg (if cfg.buffer.enable then "true" else "false")}
           buffer_seconds=${lib.escapeShellArg (toString cfg.buffer.seconds)}
 
@@ -369,13 +651,77 @@
             [ -n "$previous" ] && mmsg dispatch focusid client,"$previous" >/dev/null 2>&1 || true
           }
 
+          capture_node() {
+            local node formats line capture
+            for node in /dev/video*; do
+              [ -e "$node" ] || continue
+              formats=$(v4l2-ctl --device "$node" --list-formats-ext 2>/dev/null) || continue
+              capture=false
+              while IFS= read -r line; do
+                case "$line" in
+                  *Metadata*|*UVCH*) continue ;;
+                  *\[[0-9]*\]*)
+                    capture=true
+                    break
+                    ;;
+                esac
+              done <<< "$formats"
+              if [ "$capture" = "true" ]; then
+                printf '%s\n' "$node"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          list_formats() {
+            local chosen="''${1:-}" node formats
+            local nodes=()
+            if [ -n "$chosen" ]; then
+              nodes=("$chosen")
+            else
+              for node in /dev/video*; do
+                [ -e "$node" ] || continue
+                nodes+=("$node")
+              done
+            fi
+            for node in "''${nodes[@]}"; do
+              formats=$(v4l2-ctl --device "$node" --list-formats-ext 2>/dev/null) || continue
+              printf '%s\n' "$formats" | awk -v device="$node" '
+                /^[[:space:]]*\[[0-9]+\]:/ {
+                  fourcc = $2
+                  gsub(/[^[:alnum:]]/, "", fourcc)
+                  next
+                }
+                $1 == "Size:" && $2 == "Discrete" {
+                  print device, fourcc, $3
+                }
+              '
+            done
+          }
+
           webcam_start() {
             is_active || { notify "Start a recording first"; exit 1; }
             [ -f "$webcam_file" ] && return 0
 
             local device="$webcam_device"
-            [ -n "$device" ] || device=$(v4l2-ctl --list-devices | awk '/^[[:space:]]*\/dev\/video/{print $1; exit}')
+            [ -n "$device" ] || device=$(capture_node)
             [ -n "$device" ] || { notify "No webcam found"; exit 1; }
+
+            local fmt_parts=()
+            if [ -n "$webcam_resolution" ]; then
+              fmt_parts+=("width=''${webcam_resolution%x*}" "height=''${webcam_resolution#*x}")
+            fi
+            if [ -n "$webcam_format" ]; then
+              fmt_parts+=("pixelformat=$webcam_format")
+            fi
+
+            if [ "''${#fmt_parts[@]}" -gt 0 ]; then
+              local fmt_arg
+              fmt_arg=$(IFS=,; printf '%s' "''${fmt_parts[*]}")
+              v4l2-ctl --device "$device" --set-fmt-video="$fmt_arg" >/dev/null 2>&1 \
+                || notify "Webcam format rejected, using the device default"
+            fi
 
             local crop_filter=""
             case "$webcam_crop" in
@@ -608,12 +954,13 @@
               ;;
             overlay-resize) overlay_resize "''${2:-$webcam_size}" ;;
             list-devices) v4l2-ctl --list-devices ;;
+            list-formats) list_formats "''${2:-}" ;;
             list-sinks) pactl list short sinks ;;
             list-sources) pactl list short sources ;;
             level) level_meter "''${2:-microphone}" ;;
             cleanup) cleanup ;;
             *)
-              echo "usage: ojuny-screenrecord {start|stop|toggle|status|replay-start|replay-save|replay-stop|replay-toggle|webcam-start|webcam-stop|webcam-toggle|overlay-resize|list-devices|list-sinks|list-sources|level|cleanup}" >&2
+              echo "usage: ojuny-screenrecord {start|stop|toggle|status|replay-start|replay-save|replay-stop|replay-toggle|webcam-start|webcam-stop|webcam-toggle|overlay-resize|list-devices|list-formats|list-sinks|list-sources|level|cleanup}" >&2
               exit 2
               ;;
           esac
@@ -770,352 +1117,104 @@
       ];
     in
     {
-      options.ojuny.patch.screenrecord = {
-        backend = lib.mkOption {
-          type = lib.types.enum [
-            "auto"
-            "gpu-screen-recorder"
-            "wf-recorder"
-          ];
-          default = "auto";
-          description = "Recorder backend. auto prefers gpu-screen-recorder and falls back to wf-recorder.";
-        };
+      config = lib.mkIf active {
+        assertions = [
+          {
+            assertion = config.services.pipewire.enable;
+            message = "patch-screenrecord requires PipeWire. Enable the core audio module.";
+          }
+          {
+            assertion = !(cfg.buffer.enable && cfg.backend == "wf-recorder");
+            message = "patch-screenrecord replay buffer requires gpu-screen-recorder. Set backend to auto or gpu-screen-recorder.";
+          }
+          {
+            assertion = cfg.outputDir != "";
+            message = "patch-screenrecord requires a non-empty outputDir.";
+          }
+          {
+            assertion = cfg.webcam.format == null || builtins.stringLength cfg.webcam.format == 4;
+            message = "ojuny.patch.screenrecord.webcam.format must be exactly four characters, or null for the device default.";
+          }
+          {
+            assertion =
+              cfg.webcam.resolution == null || builtins.match "[0-9]+x[0-9]+" cfg.webcam.resolution != null;
+            message = "ojuny.patch.screenrecord.webcam.resolution must look like WxH, for example 1280x720, or null for the device default.";
+          }
+        ];
 
-        target = lib.mkOption {
-          type = lib.types.enum [
-            "region"
-            "fullscreen"
-          ];
-          default = "region";
-          description = "Capture target. region opens the slurp picker.";
-        };
+        environment.systemPackages = [ wrapper ] ++ lib.optionals cfg.obs.enable [ pkgs.obs-studio ];
 
-        outputDir = lib.mkOption {
-          type = lib.types.str;
-          default = "~/Videos";
-          description = "Recording output directory. A leading ~ expands to the user home.";
-        };
-
-        frameRate = lib.mkOption {
-          type = lib.types.ints.between 15 240;
-          default = 60;
-          description = "Capture frame rate.";
-        };
-
-        resolution = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          description = "Optional WxH for gpu-screen-recorder. Empty means native.";
-        };
-
-        audio = {
-          desktop = {
-            enable = lib.mkOption {
-              type = lib.types.bool;
-              default = true;
-              description = "Record desktop audio.";
-            };
-            sink = lib.mkOption {
-              type = lib.types.str;
-              default = "";
-              description = "Sink name. Empty follows the default sink.";
-            };
-            mute = lib.mkOption {
-              type = lib.types.bool;
-              default = false;
-              description = "Omit desktop audio at start.";
-            };
-          };
-
-          microphone = {
-            enable = lib.mkOption {
-              type = lib.types.bool;
-              default = false;
-              description = "Record microphone audio.";
-            };
-            source = lib.mkOption {
-              type = lib.types.str;
-              default = "";
-              description = "Source name. Empty follows the default source.";
-            };
-            mute = lib.mkOption {
-              type = lib.types.bool;
-              default = false;
-              description = "Omit microphone audio at start.";
-            };
-          };
-
-          levelMeter = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Install cava and pavucontrol and expose the level command.";
-          };
-        };
-
-        webcam = {
-          enable = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Start the webcam overlay with a recording.";
-          };
-          device = lib.mkOption {
-            type = lib.types.str;
-            default = "";
-            description = "V4L2 device. Empty selects the first capture device.";
-          };
-          size = lib.mkOption {
-            type = lib.types.enum [
-              "small"
-              "medium"
-              "large"
+        desktop.ojuny.mango.binds.common = lib.mkIf cfg.binds.enable {
+          ojunyScreenrecordToggle = {
+            modifier = [
+              "SUPER"
+              "ALT"
             ];
-            default = "medium";
-            description = "Overlay height preset.";
+            keys = [ "R" ];
+            dispatcher = "spawn";
+            args = "${wrapper}/bin/ojuny-screenrecord toggle";
+            description = "Start or stop screen recording";
+            group = "System";
+            subcat = "Capture";
           };
-          position = lib.mkOption {
-            type = lib.types.enum [
-              "top-left"
-              "top-right"
-              "bottom-left"
-              "bottom-right"
+
+          ojunyScreenrecordReplayToggle = lib.mkIf cfg.buffer.enable {
+            modifier = [
+              "SUPER"
+              "ALT"
             ];
-            default = "bottom-right";
-            description = "Overlay position inside the recorded region or active monitor.";
+            keys = [ "B" ];
+            dispatcher = "spawn";
+            args = "${wrapper}/bin/ojuny-screenrecord replay-toggle";
+            description = "Start or stop the replay buffer";
+            group = "System";
+            subcat = "Capture";
           };
-          crop = lib.mkOption {
-            type = lib.types.enum [
-              "8:9"
-              "1:1"
-              "16:9"
+
+          ojunyScreenrecordReplaySave = lib.mkIf cfg.buffer.enable {
+            modifier = [
+              "SUPER"
+              "ALT"
             ];
-            default = "8:9";
-            description = "Camera crop shape.";
+            keys = [ "S" ];
+            dispatcher = "spawn";
+            args = "${wrapper}/bin/ojuny-screenrecord replay-save";
+            description = "Save the last-minute replay clip";
+            group = "System";
+            subcat = "Capture";
           };
-        };
 
-        buffer = {
-          enable = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Enable the replay buffer commands and binds.";
-          };
-          seconds = lib.mkOption {
-            type = lib.types.ints.between 10 300;
-            default = 30;
-            description = "Replay buffer length in seconds.";
-          };
-        };
-
-        indicator = {
-          enable = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
-            description = "Install the DMS recording indicator.";
-          };
-          style = lib.mkOption {
-            type = lib.types.enum [
-              "plugin"
-              "privacy"
+          ojunyScreenrecordWebcam = lib.mkIf cfg.webcam.enable {
+            modifier = [
+              "SUPER"
+              "ALT"
             ];
-            default = "plugin";
-            description = "plugin installs the dedicated recording pill. privacy relies on the existing DMS privacy indicator.";
-          };
-          barId = lib.mkOption {
-            type = lib.types.str;
-            default = "default";
-            description = "DMS bar configuration that receives the widget.";
-          };
-        };
-
-        obs = {
-          enable = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Install OBS Studio and optional global binds.";
-          };
-          globalBinds = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
-            description = "Add Mango global-key rules for OBS.";
+            keys = [ "W" ];
+            dispatcher = "spawn";
+            args = "${wrapper}/bin/ojuny-screenrecord webcam-toggle";
+            description = "Start or stop the webcam overlay";
+            group = "System";
+            subcat = "Capture";
           };
         };
 
-        binds = {
-          enable = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
-            description = "Add the Mango recording binds.";
-          };
-        };
+        desktop.ojuny.mango.rules.window_rule = lib.mkAfter (
+          [ overlayRule ] ++ lib.optionals (cfg.obs.enable && cfg.obs.globalBinds) obsRules
+        );
+
+        desktop.ojuny.dux.plugins.ojunyScreenrecord =
+          lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
+            {
+              enable = true;
+              src = pluginSrc;
+            };
+
+        desktop.ojuny.dux.barConfigs.${cfg.indicator.barId}.rightWidgets.ojunyScreenrecord =
+          lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
+            {
+              enabled = true;
+              _order = 70;
+            };
       };
-
-      config = lib.mkMerge [
-        {
-          # @option widget = "dropdown"; label = "Backend"; group = "Capture"; groupOrder = 20; order = 10; choices = [ "auto" "gpu-screen-recorder" "wf-recorder" ]; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "auto prefers gpu-screen-recorder and falls back to wf-recorder. wf-recorder uses CPU encoding and has no replay buffer."
-          ojuny.patch.screenrecord.backend = "auto";
-
-          # @option widget = "dropdown"; label = "Capture target"; group = "Capture"; groupOrder = 20; order = 20; choices = [ "region" "fullscreen" ]; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "region opens the slurp picker. fullscreen records the active monitor."
-          ojuny.patch.screenrecord.target = "region";
-
-          # @option widget = "text"; label = "Output directory"; group = "Capture"; groupOrder = 20; order = 30; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Directory for recordings. ~ expands to the user home."
-          ojuny.patch.screenrecord.outputDir = "~/Videos";
-
-          # @option widget = "spin"; label = "Frame rate"; group = "Capture"; groupOrder = 20; order = 40; min = 15; max = 240; step = 5; unit = "fps"; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Capture frame rate. 60 is the default. Lower values reduce file size and CPU fallback load."
-          ojuny.patch.screenrecord.frameRate = 60;
-
-          # @option widget = "text"; label = "Resolution"; group = "Capture"; groupOrder = 20; order = 50; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Optional WxH for gpu-screen-recorder, for example 1920x1080. Empty means native resolution. Ignored by wf-recorder."
-          ojuny.patch.screenrecord.resolution = "";
-
-          # @option widget = "switch"; label = "Desktop audio"; group = "Audio"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Record the selected sink monitor source."
-          ojuny.patch.screenrecord.audio.desktop.enable = true;
-
-          # @option widget = "text"; label = "Desktop sink"; group = "Audio"; groupOrder = 30; order = 20; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.audio.desktop.enable"; visibleWhen.equals = true; description = "Sink name. Empty follows the current default sink. Use ojuny-screenrecord list-sinks to list names."
-          ojuny.patch.screenrecord.audio.desktop.sink = "";
-
-          # @option widget = "switch"; label = "Mute desktop at start"; group = "Audio"; groupOrder = 30; order = 30; visibleWhen.path = "ojuny.patch.screenrecord.audio.desktop.enable"; visibleWhen.equals = true; description = "Omit desktop audio from this recording. This does not change the global sink mute."
-          ojuny.patch.screenrecord.audio.desktop.mute = false;
-
-          # @option widget = "switch"; label = "Microphone"; group = "Audio"; groupOrder = 30; order = 40; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Record the selected microphone source. Off by default so a global recording bind does not silently open the microphone."
-          ojuny.patch.screenrecord.audio.microphone.enable = false;
-
-          # @option widget = "text"; label = "Microphone source"; group = "Audio"; groupOrder = 30; order = 50; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.audio.microphone.enable"; visibleWhen.equals = true; description = "Source name. Empty follows the current default source. Use ojuny-screenrecord list-sources to list names."
-          ojuny.patch.screenrecord.audio.microphone.source = "";
-
-          # @option widget = "switch"; label = "Mute microphone at start"; group = "Audio"; groupOrder = 30; order = 60; visibleWhen.path = "ojuny.patch.screenrecord.audio.microphone.enable"; visibleWhen.equals = true; description = "Omit microphone audio from this recording. This does not change the global source mute."
-          ojuny.patch.screenrecord.audio.microphone.mute = false;
-
-          # @option widget = "switch"; label = "Level meter"; group = "Audio"; groupOrder = 30; order = 70; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Install cava and pavucontrol and expose ojuny-screenrecord level. The meter runs only on demand."
-          ojuny.patch.screenrecord.audio.levelMeter = false;
-
-          # @option widget = "switch"; label = "Webcam overlay"; group = "Webcam"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Start the webcam overlay with a recording and include it in the captured region."
-          ojuny.patch.screenrecord.webcam.enable = false;
-
-          # @option widget = "text"; label = "Camera device"; group = "Webcam"; groupOrder = 40; order = 20; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "V4L2 device such as /dev/video0. Empty selects the first capture device. Use ojuny-screenrecord list-devices to list devices."
-          ojuny.patch.screenrecord.webcam.device = "";
-
-          # @option widget = "dropdown"; label = "Overlay size"; group = "Webcam"; groupOrder = 40; order = 30; choices = [ "small" "medium" "large" ]; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Overlay height preset: 270, 405, or 540 pixels."
-          ojuny.patch.screenrecord.webcam.size = "medium";
-
-          # @option widget = "dropdown"; label = "Overlay position"; group = "Webcam"; groupOrder = 40; order = 40; choices = [ "top-left" "top-right" "bottom-left" "bottom-right" ]; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Position inside the recorded region, or inside the active monitor for fullscreen recordings."
-          ojuny.patch.screenrecord.webcam.position = "bottom-right";
-
-          # @option widget = "dropdown"; label = "Overlay shape"; group = "Webcam"; groupOrder = 40; order = 50; choices = [ "8:9" "1:1" "16:9" ]; visibleWhen.path = "ojuny.patch.screenrecord.webcam.enable"; visibleWhen.equals = true; description = "Crop applied to the camera feed. 8:9 matches the Omarchy portrait overlay."
-          ojuny.patch.screenrecord.webcam.crop = "8:9";
-
-          # @option widget = "switch"; label = "Replay buffer"; group = "Replay buffer"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Enable the last-minute buffer and its Mango binds. Requires gpu-screen-recorder."
-          ojuny.patch.screenrecord.buffer.enable = false;
-
-          # @option widget = "spin"; label = "Buffer length"; group = "Replay buffer"; groupOrder = 50; order = 20; min = 10; max = 300; step = 5; unit = "s"; visibleWhen.path = "ojuny.patch.screenrecord.buffer.enable"; visibleWhen.equals = true; description = "Seconds kept in memory. Memory cost grows with bitrate and length."
-          ojuny.patch.screenrecord.buffer.seconds = 30;
-
-          # @option widget = "switch"; label = "Recording indicator"; group = "Indicator"; groupOrder = 60; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Install the DMS recording pill. It shows the duration and stops the recording on click."
-          ojuny.patch.screenrecord.indicator.enable = true;
-
-          # @option widget = "dropdown"; label = "Indicator style"; group = "Indicator"; groupOrder = 60; order = 20; choices = [ "plugin" "privacy" ]; visibleWhen.path = "ojuny.patch.screenrecord.indicator.enable"; visibleWhen.equals = true; description = "plugin installs the dedicated recording pill. privacy relies only on the existing DMS privacy indicator."
-          ojuny.patch.screenrecord.indicator.style = "plugin";
-
-          # @option widget = "text"; label = "Bar ID"; group = "Indicator"; groupOrder = 60; order = 30; advanced = true; visibleWhen.path = "ojuny.patch.screenrecord.indicator.style"; visibleWhen.equals = "plugin"; description = "DMS bar configuration that receives the widget. The default bar is named default."
-          ojuny.patch.screenrecord.indicator.barId = "default";
-
-          # @option widget = "switch"; label = "OBS Studio"; group = "OBS"; groupOrder = 70; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Install OBS for scenes and streaming. OBS is not driven by ojuny-screenrecord in v1."
-          ojuny.patch.screenrecord.obs.enable = false;
-
-          # @option widget = "switch"; label = "OBS global binds"; group = "OBS"; groupOrder = 70; order = 20; visibleWhen.path = "ojuny.patch.screenrecord.obs.enable"; visibleWhen.equals = true; description = "Add Mango global_key_binding rules for super+alt+o and super+alt+p. Configure the matching OBS hotkeys."
-          ojuny.patch.screenrecord.obs.globalBinds = true;
-
-          # @option widget = "switch"; label = "Mango keybinds"; group = "Keybinds"; groupOrder = 80; order = 10; visibleWhen.path = "ojuny.patch.screenrecord.enable"; visibleWhen.equals = true; description = "Add the recording, replay and webcam binds. Chords are SUPER+ALT+R, B, S and W."
-          ojuny.patch.screenrecord.binds.enable = true;
-        }
-        (lib.mkIf cfg.enable {
-          assertions = [
-            {
-              assertion = config.services.pipewire.enable;
-              message = "patch-screenrecord requires PipeWire. Enable the core audio module.";
-            }
-            {
-              assertion = !(cfg.buffer.enable && cfg.backend == "wf-recorder");
-              message = "patch-screenrecord replay buffer requires gpu-screen-recorder. Set backend to auto or gpu-screen-recorder.";
-            }
-            {
-              assertion = cfg.outputDir != "";
-              message = "patch-screenrecord requires a non-empty outputDir.";
-            }
-          ];
-
-          environment.systemPackages = [ wrapper ] ++ lib.optionals cfg.obs.enable [ pkgs.obs-studio ];
-
-          desktop.ojuny.mango.binds.common = lib.mkIf cfg.binds.enable {
-            ojunyScreenrecordToggle = {
-              modifier = [
-                "SUPER"
-                "ALT"
-              ];
-              keys = [ "R" ];
-              dispatcher = "spawn";
-              args = "${wrapper}/bin/ojuny-screenrecord toggle";
-              description = "Start or stop screen recording";
-              group = "System";
-              subcat = "Capture";
-            };
-
-            ojunyScreenrecordReplayToggle = lib.mkIf cfg.buffer.enable {
-              modifier = [
-                "SUPER"
-                "ALT"
-              ];
-              keys = [ "B" ];
-              dispatcher = "spawn";
-              args = "${wrapper}/bin/ojuny-screenrecord replay-toggle";
-              description = "Start or stop the replay buffer";
-              group = "System";
-              subcat = "Capture";
-            };
-
-            ojunyScreenrecordReplaySave = lib.mkIf cfg.buffer.enable {
-              modifier = [
-                "SUPER"
-                "ALT"
-              ];
-              keys = [ "S" ];
-              dispatcher = "spawn";
-              args = "${wrapper}/bin/ojuny-screenrecord replay-save";
-              description = "Save the last-minute replay clip";
-              group = "System";
-              subcat = "Capture";
-            };
-
-            ojunyScreenrecordWebcam = lib.mkIf cfg.webcam.enable {
-              modifier = [
-                "SUPER"
-                "ALT"
-              ];
-              keys = [ "W" ];
-              dispatcher = "spawn";
-              args = "${wrapper}/bin/ojuny-screenrecord webcam-toggle";
-              description = "Start or stop the webcam overlay";
-              group = "System";
-              subcat = "Capture";
-            };
-          };
-
-          desktop.ojuny.mango.rules.window_rule = lib.mkAfter (
-            [ overlayRule ] ++ lib.optionals (cfg.obs.enable && cfg.obs.globalBinds) obsRules
-          );
-
-          desktop.ojuny.dux.plugins.ojunyScreenrecord =
-            lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
-              {
-                enable = true;
-                src = pluginSrc;
-              };
-
-          desktop.ojuny.dux.barConfigs.${cfg.indicator.barId}.rightWidgets.ojunyScreenrecord =
-            lib.mkIf (cfg.indicator.enable && cfg.indicator.style == "plugin")
-              {
-                enabled = true;
-                _order = 70;
-              };
-        })
-      ];
     };
 }

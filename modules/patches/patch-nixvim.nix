@@ -147,29 +147,26 @@ in
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "dropdown"; label = "Engine"; group = "Nixvim"; choices = [ "auto" "nixvim" "native" ]; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "auto uses Nixvim when the host flake provides inputs.nixvim, otherwise native Neovim.";
-          ojuny.patch.nixvim.engine = "auto";
+      config = {
+        # @option widget = "dropdown"; label = "Engine"; group = "Nixvim"; choices = [ "auto" "nixvim" "native" ]; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "auto uses Nixvim when the host flake provides inputs.nixvim, otherwise native Neovim.";
+        ojuny.patch.nixvim.engine = "auto";
 
-          # @option widget = "switch"; label = "Default editor"; group = "Nixvim"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Set EDITOR and VISUAL to nvim. The template's global EDITOR default is micro.";
-          ojuny.patch.nixvim.defaultEditor = false;
+        # @option widget = "switch"; label = "Default editor"; group = "Nixvim"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Set EDITOR and VISUAL to nvim. The template's global EDITOR default is micro.";
+        ojuny.patch.nixvim.defaultEditor = false;
 
-          # @option widget = "list"; label = "Language servers"; group = "Language servers"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Languages whose LSP server is installed and enabled.";
-          ojuny.patch.nixvim.languages = defaultLanguages;
+        # @option widget = "list"; label = "Language servers"; group = "Language servers"; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Languages whose LSP server is installed and enabled.";
+        ojuny.patch.nixvim.languages = defaultLanguages;
 
-          # @option widget = "packages"; label = "Extra plugins"; group = "Advanced"; hidden = true; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Additional vim plugins as nixpkgs packages.";
-          ojuny.patch.nixvim.extraPlugins = [ ];
-        }
-        (lib.mkIf active {
-          assertions = [
-            {
-              assertion = cfg.engine != "nixvim" || hasNixvim;
-              message = "patch-nixvim: engine = \"nixvim\" requires inputs.nixvim. Add github:nix-community/nixvim to the host flake or set engine = \"native\".";
-            }
-          ];
-        })
-      ];
+        # @option widget = "packages"; label = "Extra plugins"; group = "Advanced"; hidden = true; visibleWhen.path = "ojuny.patch.nixvim.enable"; visibleWhen.equals = true; description = "Additional vim plugins as nixpkgs packages.";
+        ojuny.patch.nixvim.extraPlugins = [ ];
+
+        assertions = lib.optionals active [
+          {
+            assertion = cfg.engine != "nixvim" || hasNixvim;
+            message = "patch-nixvim: engine = \"nixvim\" requires inputs.nixvim. Add github:nix-community/nixvim to the host flake or set engine = \"native\".";
+          }
+        ];
+      };
     };
 
   flake.modules.homeManager.nixvim-backend =

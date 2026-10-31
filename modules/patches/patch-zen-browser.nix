@@ -16,6 +16,39 @@ let
 in
 {
   flake.modules.nixos.patch-zen-browser =
+    { config, lib, ... }:
+    {
+      options.ojuny.patch.zen-browser = {
+        enable = lib.mkEnableOption "Zen Browser";
+
+        defaultBrowser = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Register Zen as the default browser for web, PDF, and mail links.";
+        };
+
+        browserBind = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Point the Mango browser keybind at Zen instead of Firefox.";
+        };
+      };
+
+      imports = [ self.modules.nixos.zen-browser-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Zen Browser"; group = "Zen Browser"; description = "Install Zen Browser.";
+        ojuny.patch.zen-browser.enable = false;
+
+        # @option widget = "switch"; label = "Default browser"; group = "Zen Browser"; visibleWhen.path = "ojuny.patch.zen-browser.enable"; visibleWhen.equals = true; description = "Register Zen for web, PDF, and mail links.";
+        ojuny.patch.zen-browser.defaultBrowser = true;
+
+        # @option widget = "switch"; label = "Browser keybind"; group = "Zen Browser"; visibleWhen.path = "ojuny.patch.zen-browser.enable"; visibleWhen.equals = true; description = "Point the Mango browser keybind at Zen.";
+        ojuny.patch.zen-browser.browserBind = true;
+      };
+    };
+
+  flake.modules.nixos.zen-browser-backend =
     {
       config,
       lib,
@@ -37,59 +70,31 @@ in
       };
     in
     {
-      options.ojuny.patch.zen-browser = {
-        enable = lib.mkEnableOption "Zen Browser";
+      config = lib.mkIf cfg.enable {
+        assertions = [
+          {
+            assertion = hasZen;
+            message = "ojuny.patch.zen-browser requires inputs.zen-browser. Add github:youwen5/zen-browser-flake to the host flake.";
+          }
+        ];
 
-        defaultBrowser = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Register Zen as the default browser for web, PDF, and mail links.";
+        environment.systemPackages = lib.optional hasZen zenPackage;
+
+        desktop.ojuny.defaultApps = lib.optional hasZen zenPackage;
+
+        desktop.ojuny.mango.binds.common.browser = lib.mkIf cfg.browserBind {
+          args = lib.mkForce "zen --new-window";
         };
 
-        browserBind = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Point the Mango browser keybind at Zen instead of Firefox.";
-        };
+        xdg.mime.enable = lib.mkDefault true;
+
+        xdg.mime.defaultApplications = lib.mkIf cfg.defaultBrowser (
+          lib.mapAttrs (_: desktop: lib.mkForce desktop) browserAssociations
+        );
+
+        xdg.mime.addedAssociations = lib.mkIf cfg.defaultBrowser (
+          lib.mapAttrs (_: desktop: lib.mkForce [ desktop ]) browserAssociations
+        );
       };
-
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "Zen Browser"; group = "Zen Browser"; description = "Install Zen Browser.";
-          ojuny.patch.zen-browser.enable = false;
-
-          # @option widget = "switch"; label = "Default browser"; group = "Zen Browser"; visibleWhen.path = "ojuny.patch.zen-browser.enable"; visibleWhen.equals = true; description = "Register Zen for web, PDF, and mail links.";
-          ojuny.patch.zen-browser.defaultBrowser = true;
-
-          # @option widget = "switch"; label = "Browser keybind"; group = "Zen Browser"; visibleWhen.path = "ojuny.patch.zen-browser.enable"; visibleWhen.equals = true; description = "Point the Mango browser keybind at Zen.";
-          ojuny.patch.zen-browser.browserBind = true;
-        }
-        (lib.mkIf cfg.enable {
-          assertions = [
-            {
-              assertion = hasZen;
-              message = "ojuny.patch.zen-browser requires inputs.zen-browser. Add github:youwen5/zen-browser-flake to the host flake.";
-            }
-          ];
-
-          environment.systemPackages = lib.optional hasZen zenPackage;
-
-          desktop.ojuny.defaultApps = lib.optional hasZen zenPackage;
-
-          desktop.ojuny.mango.binds.common.browser = lib.mkIf cfg.browserBind {
-            args = lib.mkForce "zen --new-window";
-          };
-
-          xdg.mime.enable = lib.mkDefault true;
-
-          xdg.mime.defaultApplications = lib.mkIf cfg.defaultBrowser (
-            lib.mapAttrs (_: desktop: lib.mkForce desktop) browserAssociations
-          );
-
-          xdg.mime.addedAssociations = lib.mkIf cfg.defaultBrowser (
-            lib.mapAttrs (_: desktop: lib.mkForce [ desktop ]) browserAssociations
-          );
-        })
-      ];
     };
 }

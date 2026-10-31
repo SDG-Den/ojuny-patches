@@ -20,10 +20,63 @@
     {
       options.ojuny.patch.ssh-tools.enable = lib.mkEnableOption "the SSH tools patch";
 
-      # @option widget = "switch"; label = "SSH tools"; group = "SSH tools"; groupOrder = 10; order = 10; description = "Install SSH server and client configuration and helpers.";
-      config.ojuny.patch.ssh-tools.enable = false;
-
       imports = [ self.modules.nixos.ssh-tools-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "SSH tools"; group = "SSH tools"; groupOrder = 10; order = 10; description = "Install SSH server and client configuration and helpers.";
+        ojuny.patch.ssh-tools.enable = false;
+
+        # @option widget = "switch"; label = "SSH server"; group = "Server"; groupOrder = 20; order = 10; description = "Run sshd. Off by default; enabling it exposes a network service."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.enable = false;
+
+        # @option widget = "spin"; label = "Port"; group = "Server"; groupOrder = 20; order = 20; min = 1; max = 65535; description = "TCP port sshd listens on."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.port = 22;
+
+        # @option widget = "switch"; label = "Open firewall"; group = "Server"; groupOrder = 20; order = 30; description = "Open the selected TCP port in the firewall. This exposes the server beyond localhost."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.openFirewall = false;
+
+        # @option widget = "switch"; label = "Password login"; group = "Server"; groupOrder = 20; order = 40; advanced = true; description = "Allow password authentication. Keep this off when keys are available."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.passwordAuthentication = false;
+
+        # @option widget = "dropdown"; label = "Root login"; group = "Server"; groupOrder = 20; order = 50; choices = [ "no" "prohibit-password" "yes" ]; description = "PermitRootLogin value. no is the safe default."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.permitRootLogin = "no";
+
+        # @option widget = "switch"; label = "TCP forwarding"; group = "Server"; groupOrder = 20; order = 60; advanced = true; description = "Allow remote TCP forwarding through the server."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.allowTcpForwarding = false;
+
+        # @option widget = "switch"; label = "Agent forwarding"; group = "Server"; groupOrder = 20; order = 70; advanced = true; description = "Allow clients to forward their SSH agent to the server."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.allowAgentForwarding = false;
+
+        # @option widget = "list"; label = "Allowed groups"; group = "Server"; groupOrder = 20; order = 80; advanced = true; description = "Groups allowed to log in. Empty allows all groups."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.allowGroups = [ ];
+
+        # @option widget = "switch"; label = "Use DNS"; group = "Server"; groupOrder = 20; order = 90; advanced = true; description = "Look up client host names with DNS."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.useDns = true;
+
+        # @option widget = "switch"; label = "X11 forwarding"; group = "Server"; groupOrder = 20; order = 100; advanced = true; description = "Allow X11 forwarding."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.x11Forwarding = true;
+
+        # @option widget = "switch"; label = "SFTP"; group = "Server"; groupOrder = 20; order = 110; description = "Allow SFTP subsystem access."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.allowSftp = true;
+
+        # @option widget = "switch"; label = "Keyboard-interactive login"; group = "Server"; groupOrder = 20; order = 120; advanced = true; description = "Allow keyboard-interactive authentication."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.server.kbdInteractiveAuthentication = false;
+
+        # @option widget = "table-list"; label = "Authorized keys"; group = "Keys"; groupOrder = 30; order = 10; columns = [ "user" "key" ]; columnTypes = [ "str" "str" ]; description = "Public keys added to each user's authorized_keys. The User page list remains additive."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.authorizedKeys = [ ];
+
+        # @option widget = "table-list"; label = "Client hosts"; group = "Client"; groupOrder = 40; order = 10; columns = [ "alias" "hostName" "user" "port" "identityFile" "proxyJump" "forwardAgent" ]; columnTypes = [ "str" "str" "str" "int" "str" "str" "bool" ]; description = "Host aliases written to /etc/ssh/ssh_config. IdentityFile is a path to your existing private key; the patch never stores key material."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.hosts = [ ];
+
+        # @option widget = "table-list"; label = "Known hosts"; group = "Client"; groupOrder = 40; order = 20; advanced = true; columns = [ "hostName" "publicKey" ]; columnTypes = [ "str" "str" ]; description = "Optional system-wide host public keys. Use ssh-keyscan to obtain them."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.knownHosts = [ ];
+
+        # @option widget = "switch"; label = "Forwarding helpers"; group = "Helpers"; groupOrder = 50; order = 10; description = "Install fip, dip and lip, backed by PID files instead of pattern-based process matching."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.forwardingHelpers = true;
+
+        # @option widget = "switch"; label = "Keepalive defaults"; group = "Helpers"; groupOrder = 50; order = 20; description = "Set ServerAliveInterval, ServerAliveCountMax and ConnectTimeout for all hosts."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
+        ojuny.patch.ssh-tools.keepalive = true;
+      };
     };
 
   flake.modules.nixos.ssh-tools-backend =
@@ -252,61 +305,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "SSH server"; group = "Server"; groupOrder = 20; order = 10; description = "Run sshd. Off by default; enabling it exposes a network service."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.enable = false;
-
-          # @option widget = "spin"; label = "Port"; group = "Server"; groupOrder = 20; order = 20; min = 1; max = 65535; description = "TCP port sshd listens on."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.port = 22;
-
-          # @option widget = "switch"; label = "Open firewall"; group = "Server"; groupOrder = 20; order = 30; description = "Open the selected TCP port in the firewall. This exposes the server beyond localhost."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.openFirewall = false;
-
-          # @option widget = "switch"; label = "Password login"; group = "Server"; groupOrder = 20; order = 40; advanced = true; description = "Allow password authentication. Keep this off when keys are available."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.passwordAuthentication = false;
-
-          # @option widget = "dropdown"; label = "Root login"; group = "Server"; groupOrder = 20; order = 50; choices = [ "no" "prohibit-password" "yes" ]; description = "PermitRootLogin value. no is the safe default."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.permitRootLogin = "no";
-
-          # @option widget = "switch"; label = "TCP forwarding"; group = "Server"; groupOrder = 20; order = 60; advanced = true; description = "Allow remote TCP forwarding through the server."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.allowTcpForwarding = false;
-
-          # @option widget = "switch"; label = "Agent forwarding"; group = "Server"; groupOrder = 20; order = 70; advanced = true; description = "Allow clients to forward their SSH agent to the server."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.allowAgentForwarding = false;
-
-          # @option widget = "list"; label = "Allowed groups"; group = "Server"; groupOrder = 20; order = 80; advanced = true; description = "Groups allowed to log in. Empty allows all groups."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.allowGroups = [ ];
-
-          # @option widget = "switch"; label = "Use DNS"; group = "Server"; groupOrder = 20; order = 90; advanced = true; description = "Look up client host names with DNS."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.useDns = true;
-
-          # @option widget = "switch"; label = "X11 forwarding"; group = "Server"; groupOrder = 20; order = 100; advanced = true; description = "Allow X11 forwarding."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.x11Forwarding = true;
-
-          # @option widget = "switch"; label = "SFTP"; group = "Server"; groupOrder = 20; order = 110; description = "Allow SFTP subsystem access."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.allowSftp = true;
-
-          # @option widget = "switch"; label = "Keyboard-interactive login"; group = "Server"; groupOrder = 20; order = 120; advanced = true; description = "Allow keyboard-interactive authentication."; visibleWhen.path = "ojuny.patch.ssh-tools.server.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.server.kbdInteractiveAuthentication = false;
-
-          # @option widget = "table-list"; label = "Authorized keys"; group = "Keys"; groupOrder = 30; order = 10; columns = [ "user" "key" ]; columnTypes = [ "str" "str" ]; description = "Public keys added to each user's authorized_keys. The User page list remains additive."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.authorizedKeys = [ ];
-
-          # @option widget = "table-list"; label = "Client hosts"; group = "Client"; groupOrder = 40; order = 10; columns = [ "alias" "hostName" "user" "port" "identityFile" "proxyJump" "forwardAgent" ]; columnTypes = [ "str" "str" "str" "int" "str" "str" "bool" ]; description = "Host aliases written to /etc/ssh/ssh_config. IdentityFile is a path to your existing private key; the patch never stores key material."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.hosts = [ ];
-
-          # @option widget = "table-list"; label = "Known hosts"; group = "Client"; groupOrder = 40; order = 20; advanced = true; columns = [ "hostName" "publicKey" ]; columnTypes = [ "str" "str" ]; description = "Optional system-wide host public keys. Use ssh-keyscan to obtain them."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.knownHosts = [ ];
-
-          # @option widget = "switch"; label = "Forwarding helpers"; group = "Helpers"; groupOrder = 50; order = 10; description = "Install fip, dip and lip, backed by PID files instead of pattern-based process matching."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.forwardingHelpers = true;
-
-          # @option widget = "switch"; label = "Keepalive defaults"; group = "Helpers"; groupOrder = 50; order = 20; description = "Set ServerAliveInterval, ServerAliveCountMax and ConnectTimeout for all hosts."; visibleWhen.path = "ojuny.patch.ssh-tools.enable"; visibleWhen.equals = true;
-          ojuny.patch.ssh-tools.keepalive = true;
-        }
-
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           services.openssh = lib.mkIf cfg.server.enable {
             enable = true;
             ports = [ cfg.server.port ];
@@ -406,7 +405,6 @@
                 message = "SSH tools: known host names must be unique and public keys must be single-line.";
               }
             ];
-        })
-      ];
+      };
     };
 }

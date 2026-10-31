@@ -20,10 +20,39 @@
     {
       options.ojuny.patch.secondary-desktop.enable = lib.mkEnableOption "the secondary desktop patch";
 
-      # @option widget = "switch"; label = "Secondary desktop"; group = "Patches"; description = "Expose optional desktop sessions without changing the Mango/DMS session.";
-      config.ojuny.patch.secondary-desktop.enable = false;
-
       imports = [ self.modules.nixos.secondary-desktop-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Secondary desktop"; group = "Patches"; description = "Expose optional desktop sessions without changing the Mango/DMS session.";
+        ojuny.patch.secondary-desktop.enable = false;
+
+        # @option widget = "switch"; label = "KDE Plasma 6"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add KDE Plasma 6 as a login session. Configure it from Plasma's own settings.";
+        ojuny.patch.secondary-desktop.plasma = false;
+
+        # @option widget = "switch"; label = "GNOME"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add GNOME as a login session. Configure it from GNOME's own settings.";
+        ojuny.patch.secondary-desktop.gnome = false;
+
+        # @option widget = "switch"; label = "XFCE"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add XFCE as a login session. Configure it from XFCE's own settings.";
+        ojuny.patch.secondary-desktop.xfce = false;
+
+        # @option widget = "switch"; label = "COSMIC"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add COSMIC as a login session. Configure it from COSMIC's own settings.";
+        ojuny.patch.secondary-desktop.cosmic = false;
+
+        # @option widget = "switch"; label = "Cinnamon"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add Cinnamon as a login session. Configure it from Cinnamon's own settings.";
+        ojuny.patch.secondary-desktop.cinnamon = false;
+
+        # @option widget = "switch"; label = "AppIndicator"; group = "GNOME"; visibleWhen.path = "ojuny.patch.secondary-desktop.gnome"; visibleWhen.equals = true; description = "Install the AppIndicator extension and enable it. Provides a status notifier watcher for tray applications.";
+        ojuny.patch.secondary-desktop.appindicator = true;
+
+        # @option widget = "switch"; label = "GNOME games"; group = "GNOME"; visibleWhen.path = "ojuny.patch.secondary-desktop.gnome"; visibleWhen.equals = true; description = "Install the GNOME games collection.";
+        ojuny.patch.secondary-desktop.games = false;
+
+        # @option widget = "switch"; label = "Exclude GNOME extras"; group = "GNOME"; visibleWhen.path = "ojuny.patch.secondary-desktop.gnome"; visibleWhen.equals = true; description = "Exclude gnome-tour and gnome-user-docs from the GNOME session.";
+        ojuny.patch.secondary-desktop.excludePackages = true;
+
+        # @option widget = "switch"; label = "GCR SSH agent"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Enable the GCR SSH agent. Available with GNOME, XFCE, and the other secondary sessions.";
+        ojuny.patch.secondary-desktop.gcrSshAgent = true;
+      };
     };
 
   flake.modules.nixos.secondary-desktop-backend =
@@ -76,37 +105,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "KDE Plasma 6"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add KDE Plasma 6 as a login session. Configure it from Plasma's own settings.";
-          ojuny.patch.secondary-desktop.plasma = false;
-
-          # @option widget = "switch"; label = "GNOME"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add GNOME as a login session. Configure it from GNOME's own settings.";
-          ojuny.patch.secondary-desktop.gnome = false;
-
-          # @option widget = "switch"; label = "XFCE"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add XFCE as a login session. Configure it from XFCE's own settings.";
-          ojuny.patch.secondary-desktop.xfce = false;
-
-          # @option widget = "switch"; label = "COSMIC"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add COSMIC as a login session. Configure it from COSMIC's own settings.";
-          ojuny.patch.secondary-desktop.cosmic = false;
-
-          # @option widget = "switch"; label = "Cinnamon"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Add Cinnamon as a login session. Configure it from Cinnamon's own settings.";
-          ojuny.patch.secondary-desktop.cinnamon = false;
-
-          # @option widget = "switch"; label = "AppIndicator"; group = "GNOME"; visibleWhen.path = "ojuny.patch.secondary-desktop.gnome"; visibleWhen.equals = true; description = "Install the AppIndicator extension and enable it. Provides a status notifier watcher for tray applications.";
-          ojuny.patch.secondary-desktop.appindicator = true;
-
-          # @option widget = "switch"; label = "GNOME games"; group = "GNOME"; visibleWhen.path = "ojuny.patch.secondary-desktop.gnome"; visibleWhen.equals = true; description = "Install the GNOME games collection.";
-          ojuny.patch.secondary-desktop.games = false;
-
-          # @option widget = "switch"; label = "Exclude GNOME extras"; group = "GNOME"; visibleWhen.path = "ojuny.patch.secondary-desktop.gnome"; visibleWhen.equals = true; description = "Exclude gnome-tour and gnome-user-docs from the GNOME session.";
-          ojuny.patch.secondary-desktop.excludePackages = true;
-
-          # @option widget = "switch"; label = "GCR SSH agent"; group = "Desktops"; visibleWhen.path = "ojuny.patch.secondary-desktop.enable"; visibleWhen.equals = true; description = "Enable the GCR SSH agent. Available with GNOME, XFCE, and the other secondary sessions.";
-          ojuny.patch.secondary-desktop.gcrSshAgent = true;
-        }
-
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           services.desktopManager.plasma6.enable = lib.mkIf cfg.plasma true;
           services.desktopManager.gnome.enable = lib.mkIf cfg.gnome true;
           services.desktopManager.cosmic.enable = lib.mkIf cfg.cosmic true;
@@ -141,7 +140,6 @@
           ];
 
           services.displayManager.defaultSession = lib.mkForce "ojuny";
-        })
-      ];
+      };
     };
 }

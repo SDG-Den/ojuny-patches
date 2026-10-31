@@ -15,15 +15,30 @@
     {
       config,
       lib,
+      pkgs,
       ...
     }:
     {
       options.ojuny.patch.signal.enable = lib.mkEnableOption "the Signal Desktop patch";
 
-      # @option widget = "switch"; label = "Signal Desktop patch"; group = "Patches"; description = "Enable the Signal Desktop patch.";
-      config.ojuny.patch.signal.enable = false;
-
       imports = [ self.modules.nixos.signal-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Signal Desktop patch"; group = "Patches"; description = "Enable the Signal Desktop patch.";
+        ojuny.patch.signal.enable = false;
+
+        # @option widget = "switch"; label = "Handle sgnl:// links"; group = "Signal"; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Set Signal as the default handler for sgnl:// and signalcaptcha:// links.";
+        ojuny.patch.signal.setDefaultUriHandler = true;
+
+        # @option widget = "switch"; label = "Add to launcher defaults"; group = "Signal"; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Expose Signal to desktop.ojuny.defaultApps.";
+        ojuny.patch.signal.addToDefaultApps = true;
+
+        # @option widget = "package"; label = "Signal package"; group = "Advanced"; hidden = true; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Override the Signal package, for example with a newer nixpkgs if the host package is expired.";
+        ojuny.patch.signal.package = pkgs.signal-desktop;
+
+        # @option widget = "list"; label = "Extra launch flags"; group = "Advanced"; hidden = true; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Extra arguments for signal-desktop, for example --ozone-platform=x11.";
+        ojuny.patch.signal.extraFlags = [ ];
+      };
     };
 
   flake.modules.nixos.signal-backend =
@@ -92,21 +107,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "Handle sgnl:// links"; group = "Signal"; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Set Signal as the default handler for sgnl:// and signalcaptcha:// links.";
-          ojuny.patch.signal.setDefaultUriHandler = true;
-
-          # @option widget = "switch"; label = "Add to launcher defaults"; group = "Signal"; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Expose Signal to desktop.ojuny.defaultApps.";
-          ojuny.patch.signal.addToDefaultApps = true;
-
-          # @option widget = "package"; label = "Signal package"; group = "Advanced"; hidden = true; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Override the Signal package, for example with a newer nixpkgs if the host package is expired.";
-          ojuny.patch.signal.package = pkgs.signal-desktop;
-
-          # @option widget = "list"; label = "Extra launch flags"; group = "Advanced"; hidden = true; visibleWhen.path = "ojuny.patch.signal.enable"; visibleWhen.equals = true; description = "Extra arguments for signal-desktop, for example --ozone-platform=x11.";
-          ojuny.patch.signal.extraFlags = [ ];
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion = lib.hasSuffix ".desktop" cfg.desktopFile;
@@ -122,7 +123,6 @@
             "x-scheme-handler/sgnl" = cfg.desktopFile;
             "x-scheme-handler/signalcaptcha" = cfg.desktopFile;
           };
-        })
-      ];
+      };
     };
 }

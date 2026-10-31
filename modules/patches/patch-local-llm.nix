@@ -15,14 +15,98 @@
     {
       options.ojuny.patch.local-llm.enable = lib.mkEnableOption "the local LLM patch";
 
-      # @option widget = "switch"; label = "Local LLM"; group = "Local LLM"; description = "Run a local model server. The patch is off by default.";
-      config.ojuny.patch.local-llm.enable = false;
-
       imports = [ self.modules.nixos.local-llm-backend ];
 
-      config.home-manager.sharedModules = lib.mkIf (
-        config.ojuny.patch.local-llm.enable && (config.ojuny.patches or true)
-      ) [ self.modules.homeManager.local-llm-backend ];
+      config = {
+        # @option widget = "switch"; label = "Local LLM"; group = "Local LLM"; description = "Run a local model server. The patch is off by default.";
+        ojuny.patch.local-llm.enable = false;
+
+        # @option widget = "dropdown"; label = "Backend"; group = "Local LLM"; choices = [ "llama-cpp" "llama-cpp-turbo" "ollama" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama-cpp is the stable nixpkgs package. llama-cpp-turbo uses the pinned turboquant fork. ollama uses the Ollama service.";
+        ojuny.patch.local-llm.backend = "llama-cpp";
+
+        # @option widget = "dropdown"; label = "Model"; group = "Local LLM"; choices = [ "gemma4-e2b" "gemma4-e4b" "gemma4-31b" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Preset model. Use the Model group to override the file or the Ollama tag.";
+        ojuny.patch.local-llm.model = "gemma4-e4b";
+
+        # @option widget = "path"; label = "Local GGUF"; group = "Model"; nullable = true; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Use a local GGUF file for a llama.cpp backend instead of the preset download.";
+        ojuny.patch.local-llm.modelPath = null;
+
+        # @option widget = "text"; label = "Model ID"; group = "Model"; nullable = true; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Model ID exposed to clients. Defaults to the preset name or the local file name.";
+        ojuny.patch.local-llm.modelName = null;
+
+        # @option widget = "text"; label = "Ollama tag"; group = "Model"; nullable = true; placeholder = "gemma4:e4b"; visibleWhen.path = "ojuny.patch.local-llm.backend"; visibleWhen.equals = "ollama"; description = "Any tag from the Ollama library. Overrides the preset tag.";
+        ojuny.patch.local-llm.ollamaModel = null;
+
+        # @option widget = "text"; label = "Ollama models directory"; group = "Model"; nullable = true; placeholder = "/var/lib/ollama/models"; visibleWhen.path = "ojuny.patch.local-llm.backend"; visibleWhen.equals = "ollama"; description = "Where Ollama stores models. Use a path the service can write.";
+        ojuny.patch.local-llm.modelsDir = null;
+
+        # @option widget = "switch"; label = "Sync Ollama models"; group = "Model"; visibleWhen.path = "ojuny.patch.local-llm.backend"; visibleWhen.equals = "ollama"; description = "Remove installed Ollama models that are not declared by this patch.";
+        ojuny.patch.local-llm.syncModels = false;
+
+        # @option widget = "switch"; label = "Preload model"; group = "Model"; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Download the Ollama model or mark the llama.cpp model load-on-startup.";
+        ojuny.patch.local-llm.preloadModels = true;
+
+        # @option widget = "dropdown"; label = "Acceleration"; group = "Server"; choices = [ "auto" "cpu" "cuda" "rocm" "vulkan" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "auto reads ojuny.gpu, then the NixOS video drivers, and falls back to cpu.";
+        ojuny.patch.local-llm.acceleration = "auto";
+
+        # @option widget = "text"; label = "ROCm GFX override"; group = "Server"; nullable = true; placeholder = "10.3.0"; visibleWhen.path = "ojuny.patch.local-llm.acceleration"; visibleWhen.equals = "rocm"; description = "HSA_OVERRIDE_GFX_VERSION for Ollama on AMD cards that are not detected correctly.";
+        ojuny.patch.local-llm.rocmOverrideGfx = null;
+
+        # @option widget = "text"; label = "Host"; group = "Server"; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Bind address for the model server and the chat client.";
+        ojuny.patch.local-llm.host = "127.0.0.1";
+
+        # @option widget = "spin"; label = "Port"; group = "Server"; nullable = true; placeholder = "auto"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Null uses 8080 for llama.cpp and 11434 for Ollama.";
+        ojuny.patch.local-llm.port = null;
+
+        # @option widget = "spin"; label = "Context size"; group = "Server"; min = 1024; max = 262144; step = 1024; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama.cpp context and the OpenCode model context limit.";
+        ojuny.patch.local-llm.contextSize = 32768;
+
+        # @option widget = "spin"; label = "GPU layers"; group = "Server"; min = 0; max = 999; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama.cpp n-gpu-layers. Ignored by Ollama.";
+        ojuny.patch.local-llm.gpuLayers = 999;
+
+        # @option widget = "switch"; label = "Open firewall"; group = "Server"; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Open the model server port. The server has no authentication.";
+        ojuny.patch.local-llm.openFirewall = false;
+
+        # @option widget = "dropdown"; label = "Chat client"; group = "Chat client"; choices = [ "none" "open-webui" "jan" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Open WebUI is preconfigured. Jan must be configured in its own UI.";
+        ojuny.patch.local-llm.desktopClient = "none";
+
+        # @option widget = "spin"; label = "Open WebUI port"; group = "Chat client"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.local-llm.desktopClient"; visibleWhen.equals = "open-webui"; description = "Kept separate from the llama.cpp default of 8080.";
+        ojuny.patch.local-llm.desktopClientPort = 8081;
+
+        # @option widget = "switch"; label = "Open chat client firewall"; group = "Chat client"; visibleWhen.path = "ojuny.patch.local-llm.desktopClient"; visibleWhen.equals = "open-webui"; description = "Open the Open WebUI port. The UI keeps its own authentication.";
+        ojuny.patch.local-llm.desktopClientOpenFirewall = false;
+
+        # @option widget = "dropdown"; label = "Harness"; group = "Harness"; choices = [ "opencode" "none" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "OpenCode provider or server only.";
+        ojuny.patch.local-llm.harness = "opencode";
+
+        # @option widget = "switch"; label = "Install LSP servers"; group = "Harness"; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode"; description = "Add the selected language servers to the Home Manager profile. The development patch already provides them.";
+        ojuny.patch.local-llm.installLsps = false;
+
+        # @option widget = "text"; label = "Repository"; group = "Harness"; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode"; description = "Repository under $HOME that ojuny-troubleshoot reads.";
+        ojuny.patch.local-llm.projectDir = "repos/nix-flake";
+
+        # @option widget = "raw"; label = "System prompt"; group = "Harness"; rows = 8; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.notEquals = "none";
+        ojuny.patch.local-llm.systemPrompt = "You are a NixOS assistant for this Ojuny system. Read ~/repos/nix-flake. Run ojuny-troubleshoot first for diagnostics. Never change the system unless the user explicitly asks.";
+
+        # @option widget = "raw"; label = "Troubleshooting prompt"; group = "Harness"; rows = 6; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode";
+        ojuny.patch.local-llm.troubleshootingPrompt = "You diagnose Ojuny and NixOS. Run ojuny-troubleshoot first. Read the Nix configuration. Report findings and a minimal fix. Do not edit files or change the system.";
+
+        # @option widget = "list"; label = "LSP servers"; group = "Harness"; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode";
+        ojuny.patch.local-llm.lspServers = [
+          "nixd"
+          "rust-analyzer"
+          "pyright"
+          "typescript"
+          "gopls"
+          "clangd"
+        ];
+
+        # @option widget = "raw"; label = "Agents"; group = "Harness"; advanced = true; rows = 10; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode";
+        ojuny.patch.local-llm.agents = { };
+
+        home-manager.sharedModules = lib.mkIf (
+          config.ojuny.patch.local-llm.enable && (config.ojuny.patches or true)
+        ) [ self.modules.homeManager.local-llm-backend ];
+      };
     };
 
   flake.modules.nixos.local-llm-backend =
@@ -403,94 +487,10 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "dropdown"; label = "Backend"; group = "Local LLM"; choices = [ "llama-cpp" "llama-cpp-turbo" "ollama" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama-cpp is the stable nixpkgs package. llama-cpp-turbo uses the pinned turboquant fork. ollama uses the Ollama service.";
-          ojuny.patch.local-llm.backend = "llama-cpp";
+      ojuny.patch.local-llm.modelId = modelId;
+      ojuny.patch.local-llm.effectiveAcceleration = acceleration;
 
-          # @option widget = "dropdown"; label = "Model"; group = "Local LLM"; choices = [ "gemma4-e2b" "gemma4-e4b" "gemma4-31b" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Preset model. Use the Model group to override the file or the Ollama tag.";
-          ojuny.patch.local-llm.model = "gemma4-e4b";
-
-          # @option widget = "path"; label = "Local GGUF"; group = "Model"; nullable = true; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Use a local GGUF file for a llama.cpp backend instead of the preset download.";
-          ojuny.patch.local-llm.modelPath = null;
-
-          # @option widget = "text"; label = "Model ID"; group = "Model"; nullable = true; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Model ID exposed to clients. Defaults to the preset name or the local file name.";
-          ojuny.patch.local-llm.modelName = null;
-
-          # @option widget = "text"; label = "Ollama tag"; group = "Model"; nullable = true; placeholder = "gemma4:e4b"; visibleWhen.path = "ojuny.patch.local-llm.backend"; visibleWhen.equals = "ollama"; description = "Any tag from the Ollama library. Overrides the preset tag.";
-          ojuny.patch.local-llm.ollamaModel = null;
-
-          # @option widget = "text"; label = "Ollama models directory"; group = "Model"; nullable = true; placeholder = "/var/lib/ollama/models"; visibleWhen.path = "ojuny.patch.local-llm.backend"; visibleWhen.equals = "ollama"; description = "Where Ollama stores models. Use a path the service can write.";
-          ojuny.patch.local-llm.modelsDir = null;
-
-          # @option widget = "switch"; label = "Sync Ollama models"; group = "Model"; visibleWhen.path = "ojuny.patch.local-llm.backend"; visibleWhen.equals = "ollama"; description = "Remove installed Ollama models that are not declared by this patch.";
-          ojuny.patch.local-llm.syncModels = false;
-
-          # @option widget = "switch"; label = "Preload model"; group = "Model"; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Download the Ollama model or mark the llama.cpp model load-on-startup.";
-          ojuny.patch.local-llm.preloadModels = true;
-
-          # @option widget = "dropdown"; label = "Acceleration"; group = "Server"; choices = [ "auto" "cpu" "cuda" "rocm" "vulkan" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "auto reads ojuny.gpu, then the NixOS video drivers, and falls back to cpu.";
-          ojuny.patch.local-llm.acceleration = "auto";
-
-          # @option widget = "text"; label = "ROCm GFX override"; group = "Server"; nullable = true; placeholder = "10.3.0"; visibleWhen.path = "ojuny.patch.local-llm.acceleration"; visibleWhen.equals = "rocm"; description = "HSA_OVERRIDE_GFX_VERSION for Ollama on AMD cards that are not detected correctly.";
-          ojuny.patch.local-llm.rocmOverrideGfx = null;
-
-          # @option widget = "text"; label = "Host"; group = "Server"; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Bind address for the model server and the chat client.";
-          ojuny.patch.local-llm.host = "127.0.0.1";
-
-          # @option widget = "spin"; label = "Port"; group = "Server"; nullable = true; placeholder = "auto"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Null uses 8080 for llama.cpp and 11434 for Ollama.";
-          ojuny.patch.local-llm.port = null;
-
-          # @option widget = "spin"; label = "Context size"; group = "Server"; min = 1024; max = 262144; step = 1024; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama.cpp context and the OpenCode model context limit.";
-          ojuny.patch.local-llm.contextSize = 32768;
-
-          # @option widget = "spin"; label = "GPU layers"; group = "Server"; min = 0; max = 999; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "llama.cpp n-gpu-layers. Ignored by Ollama.";
-          ojuny.patch.local-llm.gpuLayers = 999;
-
-          # @option widget = "switch"; label = "Open firewall"; group = "Server"; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Open the model server port. The server has no authentication.";
-          ojuny.patch.local-llm.openFirewall = false;
-
-          # @option widget = "dropdown"; label = "Chat client"; group = "Chat client"; choices = [ "none" "open-webui" "jan" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "Open WebUI is preconfigured. Jan must be configured in its own UI.";
-          ojuny.patch.local-llm.desktopClient = "none";
-
-          # @option widget = "spin"; label = "Open WebUI port"; group = "Chat client"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.local-llm.desktopClient"; visibleWhen.equals = "open-webui"; description = "Kept separate from the llama.cpp default of 8080.";
-          ojuny.patch.local-llm.desktopClientPort = 8081;
-
-          # @option widget = "switch"; label = "Open chat client firewall"; group = "Chat client"; visibleWhen.path = "ojuny.patch.local-llm.desktopClient"; visibleWhen.equals = "open-webui"; description = "Open the Open WebUI port. The UI keeps its own authentication.";
-          ojuny.patch.local-llm.desktopClientOpenFirewall = false;
-
-          # @option widget = "dropdown"; label = "Harness"; group = "Harness"; choices = [ "opencode" "none" ]; visibleWhen.path = "ojuny.patch.local-llm.enable"; visibleWhen.equals = true; description = "OpenCode provider or server only.";
-          ojuny.patch.local-llm.harness = "opencode";
-
-          # @option widget = "switch"; label = "Install LSP servers"; group = "Harness"; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode"; description = "Add the selected language servers to the Home Manager profile. The development patch already provides them.";
-          ojuny.patch.local-llm.installLsps = false;
-
-          # @option widget = "text"; label = "Repository"; group = "Harness"; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode"; description = "Repository under $HOME that ojuny-troubleshoot reads.";
-          ojuny.patch.local-llm.projectDir = "repos/nix-flake";
-
-          # @option widget = "raw"; label = "System prompt"; group = "Harness"; rows = 8; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.notEquals = "none";
-          ojuny.patch.local-llm.systemPrompt = "You are a NixOS assistant for this Ojuny system. Read ~/repos/nix-flake. Run ojuny-troubleshoot first for diagnostics. Never change the system unless the user explicitly asks.";
-
-          # @option widget = "raw"; label = "Troubleshooting prompt"; group = "Harness"; rows = 6; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode";
-          ojuny.patch.local-llm.troubleshootingPrompt = "You diagnose Ojuny and NixOS. Run ojuny-troubleshoot first. Read the Nix configuration. Report findings and a minimal fix. Do not edit files or change the system.";
-
-          # @option widget = "list"; label = "LSP servers"; group = "Harness"; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode";
-          ojuny.patch.local-llm.lspServers = [
-            "nixd"
-            "rust-analyzer"
-            "pyright"
-            "typescript"
-            "gopls"
-            "clangd"
-          ];
-
-          # @option widget = "raw"; label = "Agents"; group = "Harness"; advanced = true; rows = 10; visibleWhen.path = "ojuny.patch.local-llm.harness"; visibleWhen.equals = "opencode";
-          ojuny.patch.local-llm.agents = { };
-
-          ojuny.patch.local-llm.modelId = modelId;
-          ojuny.patch.local-llm.effectiveAcceleration = acceleration;
-        }
-        (lib.mkIf active {
+      config = lib.mkIf active {
           assertions = [
             {
               assertion = isLlama || cfg.modelPath == null;
@@ -557,8 +557,7 @@
           };
 
           environment.systemPackages = lib.optionals (cfg.desktopClient == "jan") [ pkgs.jan ];
-        })
-      ];
+      };
     };
 
   flake.modules.homeManager.local-llm-backend =

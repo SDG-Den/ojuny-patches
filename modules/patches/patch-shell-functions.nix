@@ -547,14 +547,49 @@ in
     {
       options.ojuny.patch.shellFunctions.enable = lib.mkEnableOption "the shell-functions patch";
 
-      # @option widget = "switch"; label = "Shell functions"; group = "Patches"; description = "Enable the shell-functions patch.";
-      config.ojuny.patch.shellFunctions.enable = false;
-
       imports = [ self.modules.nixos.shell-functions-backend ];
 
-      config.home-manager.sharedModules = lib.mkIf (
-        config.ojuny.patch.shellFunctions.enable && (config.ojuny.patches or true)
-      ) [ self.modules.homeManager.shell-functions-backend ];
+      config = {
+        # @option widget = "switch"; label = "Shell functions"; group = "Patches"; description = "Enable the shell-functions patch.";
+        ojuny.patch.shellFunctions.enable = false;
+
+        # @option widget = "list"; label = "Shells"; group = "Shell functions"; groupOrder = 5; choices = [ "zsh" "bash" ]; description = "Shells that source the generated functions file."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.shells = [ "zsh" ];
+
+        # @option widget = "switch"; label = "Compression"; group = "Compression"; groupOrder = 10; order = 10; description = "compress and decompress with tar.gz."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.compression.enable = true;
+
+        # @option widget = "switch"; label = "SSH port forwarding"; group = "SSH"; groupOrder = 20; order = 10; description = "fip, dip, and lip with PID-file tracking."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.sshForwarding.enable = true;
+
+        # @option widget = "switch"; label = "SSH reconnect"; group = "SSH"; groupOrder = 20; order = 20; description = "Shadow ssh with a reconnect wrapper that disarms terminal modes. Off by default."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.sshReconnect.enable = false;
+
+        # @option widget = "switch"; label = "Git worktrees"; group = "Git worktrees"; groupOrder = 30; order = 10; description = "ga and gd without mise or gum."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.worktrees.enable = true;
+
+        # @option widget = "switch"; label = "Verify flake"; group = "Git worktrees"; groupOrder = 30; order = 20; description = "Run nix develop -c true in a new worktree that contains flake.nix."; visibleWhen.path = "ojuny.patch.shellFunctions.worktrees.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.worktrees.verifyFlake = false;
+
+        # @option widget = "switch"; label = "tmux layouts"; group = "tmux"; groupOrder = 40; order = 10; description = "tdl, tds, tdlm, and tsl."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.tmux.enable = true;
+
+        # @option widget = "text"; label = "Editor command"; group = "tmux"; groupOrder = 40; order = 20; description = "Command sent to the editor pane."; visibleWhen.path = "ojuny.patch.shellFunctions.tmux.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.tmux.editorCommand = "$EDITOR .";
+
+        # @option widget = "text"; label = "AI command"; group = "tmux"; groupOrder = 40; order = 30; description = "Command sent to the AI pane."; visibleWhen.path = "ojuny.patch.shellFunctions.tmux.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.tmux.aiCommand = "opencode";
+
+        # @option widget = "text"; label = "Diff command"; group = "tmux"; groupOrder = 40; order = 40; description = "Command sent to the diff pane."; visibleWhen.path = "ojuny.patch.shellFunctions.tmux.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.tmux.diffCommand = "git diff --color=always";
+
+        # @option widget = "switch"; label = "rsync watchers"; group = "rsync"; groupOrder = 50; order = 10; description = "rsw, lsw, and dsw. Starts background watchers. Off by default."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
+        ojuny.patch.shellFunctions.rsync.enable = false;
+
+        home-manager.sharedModules = lib.mkIf (
+          config.ojuny.patch.shellFunctions.enable && (config.ojuny.patches or true)
+        ) [ self.modules.homeManager.shell-functions-backend ];
+      };
     };
 
   flake.modules.nixos.shell-functions-backend =
@@ -571,42 +606,7 @@ in
     {
       options.ojuny.patch.shellFunctions = mkOptions lib;
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "list"; label = "Shells"; group = "Shell functions"; groupOrder = 5; choices = [ "zsh" "bash" ]; description = "Shells that source the generated functions file."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.shells = [ "zsh" ];
-
-          # @option widget = "switch"; label = "Compression"; group = "Compression"; groupOrder = 10; order = 10; description = "compress and decompress with tar.gz."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.compression.enable = true;
-
-          # @option widget = "switch"; label = "SSH port forwarding"; group = "SSH"; groupOrder = 20; order = 10; description = "fip, dip, and lip with PID-file tracking."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.sshForwarding.enable = true;
-
-          # @option widget = "switch"; label = "SSH reconnect"; group = "SSH"; groupOrder = 20; order = 20; description = "Shadow ssh with a reconnect wrapper that disarms terminal modes. Off by default."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.sshReconnect.enable = false;
-
-          # @option widget = "switch"; label = "Git worktrees"; group = "Git worktrees"; groupOrder = 30; order = 10; description = "ga and gd without mise or gum."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.worktrees.enable = true;
-
-          # @option widget = "switch"; label = "Verify flake"; group = "Git worktrees"; groupOrder = 30; order = 20; description = "Run nix develop -c true in a new worktree that contains flake.nix."; visibleWhen.path = "ojuny.patch.shellFunctions.worktrees.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.worktrees.verifyFlake = false;
-
-          # @option widget = "switch"; label = "tmux layouts"; group = "tmux"; groupOrder = 40; order = 10; description = "tdl, tds, tdlm, and tsl."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.tmux.enable = true;
-
-          # @option widget = "text"; label = "Editor command"; group = "tmux"; groupOrder = 40; order = 20; description = "Command sent to the editor pane."; visibleWhen.path = "ojuny.patch.shellFunctions.tmux.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.tmux.editorCommand = "$EDITOR .";
-
-          # @option widget = "text"; label = "AI command"; group = "tmux"; groupOrder = 40; order = 30; description = "Command sent to the AI pane."; visibleWhen.path = "ojuny.patch.shellFunctions.tmux.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.tmux.aiCommand = "opencode";
-
-          # @option widget = "text"; label = "Diff command"; group = "tmux"; groupOrder = 40; order = 40; description = "Command sent to the diff pane."; visibleWhen.path = "ojuny.patch.shellFunctions.tmux.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.tmux.diffCommand = "git diff --color=always";
-
-          # @option widget = "switch"; label = "rsync watchers"; group = "rsync"; groupOrder = 50; order = 10; description = "rsw, lsw, and dsw. Starts background watchers. Off by default."; visibleWhen.path = "ojuny.patch.shellFunctions.enable"; visibleWhen.equals = true;
-          ojuny.patch.shellFunctions.rsync.enable = false;
-        }
-        (lib.mkIf active {
+      config = lib.mkIf active {
           environment.etc."ojuny/shell-functions.sh".source = mkScript { inherit lib pkgs cfg; };
 
           environment.systemPackages = mkPackages { inherit lib pkgs cfg; };
@@ -618,8 +618,7 @@ in
           programs.bash.interactiveShellInit = lib.mkIf (lib.elem "bash" cfg.shells) ''
             source /etc/ojuny/shell-functions.sh
           '';
-        })
-      ];
+      };
     };
 
   flake.modules.homeManager.shell-functions-backend =

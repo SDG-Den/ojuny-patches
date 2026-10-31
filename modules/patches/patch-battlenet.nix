@@ -15,10 +15,18 @@
     {
       options.ojuny.patch.battlenet.enable = lib.mkEnableOption "the Battle.net patch";
 
-      # @option widget = "switch"; label = "Battle.net"; group = "Battle.net"; description = "Install the Battle.net installer, launcher, reset command, and desktop entry. The installer downloads from Blizzard on first run.";
-      config.ojuny.patch.battlenet.enable = false;
-
       imports = [ self.modules.nixos.battlenet-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Battle.net"; group = "Battle.net"; description = "Install the Battle.net installer, launcher, reset command, and desktop entry. The installer downloads from Blizzard on first run.";
+        ojuny.patch.battlenet.enable = false;
+
+        # @option widget = "text"; label = "Wine prefix"; group = "Battle.net"; description = "Per-user Battle.net prefix. Keep the default unless another location is required."; visibleWhen.path = "ojuny.patch.battlenet.enable"; visibleWhen.equals = true;
+        ojuny.patch.battlenet.prefix = "$HOME/Games/battlenet";
+
+        # @option widget = "switch"; label = "MangoHud"; group = "Battle.net"; description = "Run Battle.net and its games with the MangoHud overlay."; advanced = true; visibleWhen.path = "ojuny.patch.battlenet.enable"; visibleWhen.equals = true;
+        ojuny.patch.battlenet.mangohud = false;
+      };
     };
 
   flake.modules.nixos.battlenet-backend =
@@ -191,20 +199,11 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "text"; label = "Wine prefix"; group = "Battle.net"; description = "Per-user Battle.net prefix. Keep the default unless another location is required."; visibleWhen.path = "ojuny.patch.battlenet.enable"; visibleWhen.equals = true;
-          ojuny.patch.battlenet.prefix = "$HOME/Games/battlenet";
-
-          # @option widget = "switch"; label = "MangoHud"; group = "Battle.net"; description = "Run Battle.net and its games with the MangoHud overlay."; advanced = true; visibleWhen.path = "ojuny.patch.battlenet.enable"; visibleWhen.equals = true;
-          ojuny.patch.battlenet.mangohud = false;
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           hardware.graphics.enable = lib.mkDefault true;
           hardware.graphics.enable32Bit = lib.mkIf pkgs.stdenv.hostPlatform.isx86_64 true;
 
           environment.systemPackages = [ package ];
-        })
-      ];
+      };
     };
 }

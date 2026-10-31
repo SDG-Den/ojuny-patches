@@ -16,10 +16,78 @@
     {
       options.ojuny.patch.databases.enable = lib.mkEnableOption "the local databases patch";
 
-      # @option widget = "switch"; label = "Databases"; group = "Databases"; description = "Run local PostgreSQL, MariaDB and Redis containers. Data is stored in Docker volumes and persists across rebuilds.";
-      config.ojuny.patch.databases.enable = false;
-
       imports = [ self.modules.nixos.databases-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Databases"; group = "Databases"; description = "Run local PostgreSQL, MariaDB and Redis containers. Data is stored in Docker volumes and persists across rebuilds.";
+        ojuny.patch.databases.enable = false;
+
+        # @option widget = "path"; label = "Credential directory"; group = "Advanced"; hidden = true; description = "Root-only directory for generated database passwords.";
+        ojuny.patch.databases.credentialDir = "/var/lib/ojuny/databases";
+
+        # @option widget = "text"; label = "Credential group"; group = "Advanced"; hidden = true; description = "Group that can read staged passwords in /run/ojuny-databases. Members are administrator-equivalent.";
+        ojuny.patch.databases.credentialGroup = "wheel";
+
+        # @option widget = "switch"; label = "PostgreSQL"; group = "PostgreSQL"; visibleWhen.path = "ojuny.patch.databases.enable"; visibleWhen.equals = true; description = "Run a local PostgreSQL server with a named data volume.";
+        ojuny.patch.databases.postgres.enable = true;
+
+        # @option widget = "spin"; label = "Port"; group = "PostgreSQL"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Loopback port published on 127.0.0.1.";
+        ojuny.patch.databases.postgres.port = 5432;
+
+        # @option widget = "text"; label = "User"; group = "PostgreSQL"; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Superuser and default connection user.";
+        ojuny.patch.databases.postgres.user = "ojuny";
+
+        # @option widget = "text"; label = "Database"; group = "PostgreSQL"; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Database created on first start.";
+        ojuny.patch.databases.postgres.database = "ojuny";
+
+        # @option widget = "text"; label = "Password file"; group = "PostgreSQL"; advanced = true; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Absolute path to a password file. Empty generates a random password under the credential directory.";
+        ojuny.patch.databases.postgres.passwordFile = "";
+
+        # @option widget = "text"; label = "Volume"; group = "Advanced"; hidden = true; description = "Docker volume for PostgreSQL data.";
+        ojuny.patch.databases.postgres.volume = "ojuny-postgres-data";
+
+        # @option widget = "text"; label = "Image"; group = "Advanced"; hidden = true; description = "PostgreSQL container image.";
+        ojuny.patch.databases.postgres.image = "docker.io/library/postgres:17";
+
+        # @option widget = "switch"; label = "MariaDB"; group = "MariaDB"; visibleWhen.path = "ojuny.patch.databases.enable"; visibleWhen.equals = true; description = "Run a local MariaDB server with a named data volume.";
+        ojuny.patch.databases.mariadb.enable = false;
+
+        # @option widget = "spin"; label = "Port"; group = "MariaDB"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Loopback port published on 127.0.0.1.";
+        ojuny.patch.databases.mariadb.port = 3306;
+
+        # @option widget = "text"; label = "User"; group = "MariaDB"; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Application user created on first start.";
+        ojuny.patch.databases.mariadb.user = "ojuny";
+
+        # @option widget = "text"; label = "Database"; group = "MariaDB"; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Database created on first start.";
+        ojuny.patch.databases.mariadb.database = "ojuny";
+
+        # @option widget = "text"; label = "User password file"; group = "MariaDB"; advanced = true; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Absolute path to the application user password file. Empty generates one.";
+        ojuny.patch.databases.mariadb.passwordFile = "";
+
+        # @option widget = "text"; label = "Root password file"; group = "MariaDB"; advanced = true; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Absolute path to the root password file. Empty generates one.";
+        ojuny.patch.databases.mariadb.rootPasswordFile = "";
+
+        # @option widget = "text"; label = "Volume"; group = "Advanced"; hidden = true; description = "Docker volume for MariaDB data.";
+        ojuny.patch.databases.mariadb.volume = "ojuny-mariadb-data";
+
+        # @option widget = "text"; label = "Image"; group = "Advanced"; hidden = true; description = "MariaDB container image.";
+        ojuny.patch.databases.mariadb.image = "docker.io/library/mariadb:11.4";
+
+        # @option widget = "switch"; label = "Redis"; group = "Redis"; visibleWhen.path = "ojuny.patch.databases.enable"; visibleWhen.equals = true; description = "Run a local Redis server with a named data volume.";
+        ojuny.patch.databases.redis.enable = false;
+
+        # @option widget = "spin"; label = "Port"; group = "Redis"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.databases.redis.enable"; visibleWhen.equals = true; description = "Loopback port published on 127.0.0.1.";
+        ojuny.patch.databases.redis.port = 6379;
+
+        # @option widget = "text"; label = "Password file"; group = "Redis"; advanced = true; visibleWhen.path = "ojuny.patch.databases.redis.enable"; visibleWhen.equals = true; description = "Absolute path to the Redis password file. Empty generates one.";
+        ojuny.patch.databases.redis.passwordFile = "";
+
+        # @option widget = "text"; label = "Volume"; group = "Advanced"; hidden = true; description = "Docker volume for Redis data.";
+        ojuny.patch.databases.redis.volume = "ojuny-redis-data";
+
+        # @option widget = "text"; label = "Image"; group = "Advanced"; hidden = true; description = "Redis container image.";
+        ojuny.patch.databases.redis.image = "docker.io/library/redis:7-alpine";
+      };
     };
 
   flake.modules.nixos.databases-backend =
@@ -335,75 +403,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "path"; label = "Credential directory"; group = "Advanced"; hidden = true; description = "Root-only directory for generated database passwords.";
-          ojuny.patch.databases.credentialDir = "/var/lib/ojuny/databases";
-
-          # @option widget = "text"; label = "Credential group"; group = "Advanced"; hidden = true; description = "Group that can read staged passwords in /run/ojuny-databases. Members are administrator-equivalent.";
-          ojuny.patch.databases.credentialGroup = "wheel";
-
-          # @option widget = "switch"; label = "PostgreSQL"; group = "PostgreSQL"; visibleWhen.path = "ojuny.patch.databases.enable"; visibleWhen.equals = true; description = "Run a local PostgreSQL server with a named data volume.";
-          ojuny.patch.databases.postgres.enable = true;
-
-          # @option widget = "spin"; label = "Port"; group = "PostgreSQL"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Loopback port published on 127.0.0.1.";
-          ojuny.patch.databases.postgres.port = 5432;
-
-          # @option widget = "text"; label = "User"; group = "PostgreSQL"; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Superuser and default connection user.";
-          ojuny.patch.databases.postgres.user = "ojuny";
-
-          # @option widget = "text"; label = "Database"; group = "PostgreSQL"; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Database created on first start.";
-          ojuny.patch.databases.postgres.database = "ojuny";
-
-          # @option widget = "text"; label = "Password file"; group = "PostgreSQL"; advanced = true; visibleWhen.path = "ojuny.patch.databases.postgres.enable"; visibleWhen.equals = true; description = "Absolute path to a password file. Empty generates a random password under the credential directory.";
-          ojuny.patch.databases.postgres.passwordFile = "";
-
-          # @option widget = "text"; label = "Volume"; group = "Advanced"; hidden = true; description = "Docker volume for PostgreSQL data.";
-          ojuny.patch.databases.postgres.volume = "ojuny-postgres-data";
-
-          # @option widget = "text"; label = "Image"; group = "Advanced"; hidden = true; description = "PostgreSQL container image.";
-          ojuny.patch.databases.postgres.image = "docker.io/library/postgres:17";
-
-          # @option widget = "switch"; label = "MariaDB"; group = "MariaDB"; visibleWhen.path = "ojuny.patch.databases.enable"; visibleWhen.equals = true; description = "Run a local MariaDB server with a named data volume.";
-          ojuny.patch.databases.mariadb.enable = false;
-
-          # @option widget = "spin"; label = "Port"; group = "MariaDB"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Loopback port published on 127.0.0.1.";
-          ojuny.patch.databases.mariadb.port = 3306;
-
-          # @option widget = "text"; label = "User"; group = "MariaDB"; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Application user created on first start.";
-          ojuny.patch.databases.mariadb.user = "ojuny";
-
-          # @option widget = "text"; label = "Database"; group = "MariaDB"; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Database created on first start.";
-          ojuny.patch.databases.mariadb.database = "ojuny";
-
-          # @option widget = "text"; label = "User password file"; group = "MariaDB"; advanced = true; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Absolute path to the application user password file. Empty generates one.";
-          ojuny.patch.databases.mariadb.passwordFile = "";
-
-          # @option widget = "text"; label = "Root password file"; group = "MariaDB"; advanced = true; visibleWhen.path = "ojuny.patch.databases.mariadb.enable"; visibleWhen.equals = true; description = "Absolute path to the root password file. Empty generates one.";
-          ojuny.patch.databases.mariadb.rootPasswordFile = "";
-
-          # @option widget = "text"; label = "Volume"; group = "Advanced"; hidden = true; description = "Docker volume for MariaDB data.";
-          ojuny.patch.databases.mariadb.volume = "ojuny-mariadb-data";
-
-          # @option widget = "text"; label = "Image"; group = "Advanced"; hidden = true; description = "MariaDB container image.";
-          ojuny.patch.databases.mariadb.image = "docker.io/library/mariadb:11.4";
-
-          # @option widget = "switch"; label = "Redis"; group = "Redis"; visibleWhen.path = "ojuny.patch.databases.enable"; visibleWhen.equals = true; description = "Run a local Redis server with a named data volume.";
-          ojuny.patch.databases.redis.enable = false;
-
-          # @option widget = "spin"; label = "Port"; group = "Redis"; min = 1; max = 65535; visibleWhen.path = "ojuny.patch.databases.redis.enable"; visibleWhen.equals = true; description = "Loopback port published on 127.0.0.1.";
-          ojuny.patch.databases.redis.port = 6379;
-
-          # @option widget = "text"; label = "Password file"; group = "Redis"; advanced = true; visibleWhen.path = "ojuny.patch.databases.redis.enable"; visibleWhen.equals = true; description = "Absolute path to the Redis password file. Empty generates one.";
-          ojuny.patch.databases.redis.passwordFile = "";
-
-          # @option widget = "text"; label = "Volume"; group = "Advanced"; hidden = true; description = "Docker volume for Redis data.";
-          ojuny.patch.databases.redis.volume = "ojuny-redis-data";
-
-          # @option widget = "text"; label = "Image"; group = "Advanced"; hidden = true; description = "Redis container image.";
-          ojuny.patch.databases.redis.image = "docker.io/library/redis:7-alpine";
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion = enabledEngines == [ ] || config.virtualisation.docker.enable;
@@ -557,7 +557,6 @@
               }) enabledEngines
             ))
           ];
-        })
-      ];
+      };
     };
 }

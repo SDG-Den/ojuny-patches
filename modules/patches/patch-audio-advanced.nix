@@ -17,10 +17,57 @@
     {
       options.ojuny.patch.audio-advanced.enable = lib.mkEnableOption "the advanced audio patch";
 
-      # @option widget = "switch"; label = "Advanced audio"; group = "Advanced audio"; groupOrder = 10; order = 10; description = "Enable the optional advanced audio stack. The core PipeWire module must already be enabled."
-      config.ojuny.patch.audio-advanced.enable = false;
-
       imports = [ self.modules.nixos.audio-advanced-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Advanced audio"; group = "Advanced audio"; groupOrder = 10; order = 10; description = "Enable the optional advanced audio stack. The core PipeWire module must already be enabled."
+        ojuny.patch.audio-advanced.enable = false;
+
+        # @option widget = "switch"; label = "EasyEffects"; group = "Effects"; groupOrder = 20; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install EasyEffects and its PipeWire effects chain."
+        ojuny.patch.audio-advanced.easyeffects = true;
+
+        # @option widget = "switch"; label = "Start EasyEffects at login"; group = "Effects"; groupOrder = 20; order = 20; visibleWhen.path = "ojuny.patch.audio-advanced.easyeffects"; visibleWhen.equals = true; description = "Run EasyEffects as a systemd user service. Disable this if EasyEffects is started from its own autostart setting."
+        ojuny.patch.audio-advanced.easyeffectsAutostart = true;
+
+        # @option widget = "switch"; label = "Carla"; group = "Hosts"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install the Carla plugin host. It connects to PipeWire or JACK."
+        ojuny.patch.audio-advanced.carla = false;
+
+        # @option widget = "switch"; label = "Ardour"; group = "Hosts"; groupOrder = 30; order = 20; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install the Ardour digital audio workstation."
+        ojuny.patch.audio-advanced.ardour = false;
+
+        # @option widget = "switch"; label = "Plugin bundles"; group = "Hosts"; groupOrder = 30; order = 30; advanced = true; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install LSP, Calf, x42, Zam and MDA LV2 plugin bundles."
+        ojuny.patch.audio-advanced.plugins = false;
+
+        # @option widget = "switch"; label = "JACK compatibility"; group = "JACK and Windows audio"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Enable PipeWire JACK emulation and install qjackctl, qpwgraph and jack2 tools. Do not combine with the jackd service."
+        ojuny.patch.audio-advanced.jack = false;
+
+        # @option widget = "switch"; label = "WineASIO"; group = "JACK and Windows audio"; groupOrder = 40; order = 20; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install the 64-bit WineASIO bridge and Wine. This turns on JACK compatibility. Register the driver in each Wine prefix with wineasio-settings."
+        ojuny.patch.audio-advanced.wineasio = false;
+
+        # @option widget = "switch"; label = "Low-latency profile"; group = "Low latency"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Apply a fixed PipeWire sample rate and quantum system-wide. Higher CPU use and possible xruns."
+        ojuny.patch.audio-advanced.lowLatency = false;
+
+        # @option widget = "dropdown"; label = "Sample rate"; group = "Low latency"; groupOrder = 50; order = 20; choices = [ "44100" "48000" "88200" "96000" ]; visibleWhen.path = "ojuny.patch.audio-advanced.lowLatency"; visibleWhen.equals = true; description = "PipeWire default clock rate while the low-latency profile is active."
+        ojuny.patch.audio-advanced.sampleRate = 48000;
+
+        # @option widget = "spin"; label = "Quantum"; group = "Low latency"; groupOrder = 50; order = 30; min = 32; max = 2048; step = 32; visibleWhen.path = "ojuny.patch.audio-advanced.lowLatency"; visibleWhen.equals = true; description = "Fixed PipeWire buffer size in frames. Lower values reduce latency and increase xrun risk."
+        ojuny.patch.audio-advanced.quantum = 128;
+
+        # @option widget = "list"; label = "Realtime users"; group = "Low latency"; groupOrder = 50; order = 40; advanced = true; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Users added to the realtime group with rtprio 95 and unlimited memlock. Leave empty to rely on rtkit only."
+        ojuny.patch.audio-advanced.realtimeGroupMembers = [ ];
+
+        # @option widget = "switch"; label = "Generic speaker tuning"; group = "Speaker tuning"; groupOrder = 60; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Start a standalone PipeWire filter-chain with a modest bass and treble shelf. Adds a selectable virtual sink and does not change DMS device routing."
+        ojuny.patch.audio-advanced.speakerTuning = false;
+
+        # @option widget = "slider"; label = "Bass gain"; group = "Speaker tuning"; groupOrder = 60; order = 20; min = -12.0; max = 12.0; step = 0.5; visibleWhen.path = "ojuny.patch.audio-advanced.speakerTuning"; visibleWhen.equals = true; description = "Low-shelf gain in dB at 120 Hz. Keep changes modest; a wrong boost can distort small speakers."
+        ojuny.patch.audio-advanced.speakerTuningBass = 2.0;
+
+        # @option widget = "slider"; label = "Treble gain"; group = "Speaker tuning"; groupOrder = 60; order = 30; min = -12.0; max = 12.0; step = 0.5; visibleWhen.path = "ojuny.patch.audio-advanced.speakerTuning"; visibleWhen.equals = true; description = "High-shelf gain in dB at 6000 Hz. Negative values tame harsh speakers."
+        ojuny.patch.audio-advanced.speakerTuningTreble = -1.0;
+
+        # @option widget = "text"; label = "Output node"; group = "Speaker tuning"; groupOrder = 60; order = 40; advanced = true; visibleWhen.path = "ojuny.patch.audio-advanced.speakerTuning"; visibleWhen.equals = true; description = "Physical PipeWire sink node name to pin the tuning output to. Empty follows the current default sink; setting a target prevents a feedback loop when the tuning sink becomes default."
+        ojuny.patch.audio-advanced.speakerTuningTarget = "";
+      };
     };
 
   flake.modules.nixos.audio-advanced-backend =
@@ -163,54 +210,7 @@
         };
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "EasyEffects"; group = "Effects"; groupOrder = 20; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install EasyEffects and its PipeWire effects chain."
-          ojuny.patch.audio-advanced.easyeffects = true;
-
-          # @option widget = "switch"; label = "Start EasyEffects at login"; group = "Effects"; groupOrder = 20; order = 20; visibleWhen.path = "ojuny.patch.audio-advanced.easyeffects"; visibleWhen.equals = true; description = "Run EasyEffects as a systemd user service. Disable this if EasyEffects is started from its own autostart setting."
-          ojuny.patch.audio-advanced.easyeffectsAutostart = true;
-
-          # @option widget = "switch"; label = "Carla"; group = "Hosts"; groupOrder = 30; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install the Carla plugin host. It connects to PipeWire or JACK."
-          ojuny.patch.audio-advanced.carla = false;
-
-          # @option widget = "switch"; label = "Ardour"; group = "Hosts"; groupOrder = 30; order = 20; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install the Ardour digital audio workstation."
-          ojuny.patch.audio-advanced.ardour = false;
-
-          # @option widget = "switch"; label = "Plugin bundles"; group = "Hosts"; groupOrder = 30; order = 30; advanced = true; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install LSP, Calf, x42, Zam and MDA LV2 plugin bundles."
-          ojuny.patch.audio-advanced.plugins = false;
-
-          # @option widget = "switch"; label = "JACK compatibility"; group = "JACK and Windows audio"; groupOrder = 40; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Enable PipeWire JACK emulation and install qjackctl, qpwgraph and jack2 tools. Do not combine with the jackd service."
-          ojuny.patch.audio-advanced.jack = false;
-
-          # @option widget = "switch"; label = "WineASIO"; group = "JACK and Windows audio"; groupOrder = 40; order = 20; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Install the 64-bit WineASIO bridge and Wine. This turns on JACK compatibility. Register the driver in each Wine prefix with wineasio-settings."
-          ojuny.patch.audio-advanced.wineasio = false;
-
-          # @option widget = "switch"; label = "Low-latency profile"; group = "Low latency"; groupOrder = 50; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Apply a fixed PipeWire sample rate and quantum system-wide. Higher CPU use and possible xruns."
-          ojuny.patch.audio-advanced.lowLatency = false;
-
-          # @option widget = "dropdown"; label = "Sample rate"; group = "Low latency"; groupOrder = 50; order = 20; choices = [ "44100" "48000" "88200" "96000" ]; visibleWhen.path = "ojuny.patch.audio-advanced.lowLatency"; visibleWhen.equals = true; description = "PipeWire default clock rate while the low-latency profile is active."
-          ojuny.patch.audio-advanced.sampleRate = 48000;
-
-          # @option widget = "spin"; label = "Quantum"; group = "Low latency"; groupOrder = 50; order = 30; min = 32; max = 2048; step = 32; visibleWhen.path = "ojuny.patch.audio-advanced.lowLatency"; visibleWhen.equals = true; description = "Fixed PipeWire buffer size in frames. Lower values reduce latency and increase xrun risk."
-          ojuny.patch.audio-advanced.quantum = 128;
-
-          # @option widget = "list"; label = "Realtime users"; group = "Low latency"; groupOrder = 50; order = 40; advanced = true; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Users added to the realtime group with rtprio 95 and unlimited memlock. Leave empty to rely on rtkit only."
-          ojuny.patch.audio-advanced.realtimeGroupMembers = [ ];
-
-          # @option widget = "switch"; label = "Generic speaker tuning"; group = "Speaker tuning"; groupOrder = 60; order = 10; visibleWhen.path = "ojuny.patch.audio-advanced.enable"; visibleWhen.equals = true; description = "Start a standalone PipeWire filter-chain with a modest bass and treble shelf. Adds a selectable virtual sink and does not change DMS device routing."
-          ojuny.patch.audio-advanced.speakerTuning = false;
-
-          # @option widget = "slider"; label = "Bass gain"; group = "Speaker tuning"; groupOrder = 60; order = 20; min = -12.0; max = 12.0; step = 0.5; visibleWhen.path = "ojuny.patch.audio-advanced.speakerTuning"; visibleWhen.equals = true; description = "Low-shelf gain in dB at 120 Hz. Keep changes modest; a wrong boost can distort small speakers."
-          ojuny.patch.audio-advanced.speakerTuningBass = 2.0;
-
-          # @option widget = "slider"; label = "Treble gain"; group = "Speaker tuning"; groupOrder = 60; order = 30; min = -12.0; max = 12.0; step = 0.5; visibleWhen.path = "ojuny.patch.audio-advanced.speakerTuning"; visibleWhen.equals = true; description = "High-shelf gain in dB at 6000 Hz. Negative values tame harsh speakers."
-          ojuny.patch.audio-advanced.speakerTuningTreble = -1.0;
-
-          # @option widget = "text"; label = "Output node"; group = "Speaker tuning"; groupOrder = 60; order = 40; advanced = true; visibleWhen.path = "ojuny.patch.audio-advanced.speakerTuning"; visibleWhen.equals = true; description = "Physical PipeWire sink node name to pin the tuning output to. Empty follows the current default sink; setting a target prevents a feedback loop when the tuning sink becomes default."
-          ojuny.patch.audio-advanced.speakerTuningTarget = "";
-        }
-        (lib.mkIf cfg.enable {
+      config = lib.mkIf cfg.enable {
           assertions = [
             {
               assertion = config.services.pipewire.enable;
@@ -322,7 +322,6 @@
               RestartSec = 2;
             };
           };
-        })
-      ];
+      };
     };
 }

@@ -15,10 +15,15 @@
     {
       options.ojuny.patch.aux-hardware.enable = lib.mkEnableOption "the auxiliary hardware patch";
 
-      # @option widget = "switch"; label = "Auxiliary hardware"; group = "Auxiliary hardware";
-      config.ojuny.patch.aux-hardware.enable = false;
-
       imports = [ self.modules.nixos.aux-hardware-backend ];
+
+      config = {
+        # @option widget = "switch"; label = "Auxiliary hardware"; group = "Auxiliary hardware";
+        ojuny.patch.aux-hardware.enable = false;
+
+        # @option widget = "switch"; label = "Tablet"; group = "Auxiliary hardware"; visibleWhen.path = "ojuny.patch.aux-hardware.enable"; visibleWhen.equals = true;
+        ojuny.patch.aux-hardware.tablet = false;
+      };
     };
 
   flake.modules.nixos.aux-hardware-backend =
@@ -39,15 +44,9 @@
         tablet = lib.mkEnableOption "OpenTabletDriver";
       };
 
-      config = lib.mkMerge [
-        {
-          # @option widget = "switch"; label = "Tablet"; group = "Auxiliary hardware"; visibleWhen.path = "ojuny.patch.aux-hardware.enable"; visibleWhen.equals = true;
-          ojuny.patch.aux-hardware.tablet = false;
-        }
-        (lib.mkIf active {
+      config = lib.mkIf active {
           hardware.opentabletdriver.enable = cfg.tablet;
           hardware.uinput.enable = cfg.tablet;
-        })
-      ];
+      };
     };
 }
